@@ -7,41 +7,29 @@ services:
       - 6379:6379
     volumes:
       - redis:/data
-  postgres:
-    image: postgres:10
+  supernorm:
+    image: supernorm
     restart: always
     environment:
-      POSTGRES_DB: superset
-      POSTGRES_PASSWORD: superset
-      POSTGRES_USER: superset
-    ports:
-      - 5432:5432
-    volumes:
-      - postgres:/var/lib/postgresql/data
-  superset:
-    image: apache/incubator-superset
-    restart: always
-    environment:
-      POSTGRES_DB: superset
-      POSTGRES_USER: superset
-      POSTGRES_PASSWORD: superset
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: 5432
+      SUPERSET_CONFIG_PATH: /home/work/supernorm/supernorm_config.py
+      MYSQL_DB: superset
+      MYSQL_USER: root
+      MYSQL_PASSWORD: root
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SUPERSET_ENV: local
     ports:
       - 8088:8088
     command: "tail -f /dev/null"
+    network_mode: host
     depends_on:
-      - postgres
       - redis
     volumes:
       - .:/home/work/supernorm
       - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
 volumes:
-  postgres:
-    external: false
   redis:
     external: false
   superset-node-modules:

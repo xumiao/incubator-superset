@@ -1,4 +1,4 @@
-FROM python:3.6
+FROM ubuntu:latest
 
 MAINTAINER Xu Miao
 
@@ -10,14 +10,44 @@ ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     HOME=/home/work
 
-RUN apt-get update -y
+COPY ./superset ./superset
+COPY ./norm ./norm
+RUN chown -R work:work $HOME
 
 # Install some dependencies
 # http://airbnb.io/superset/installation.html#os-dependencies
-RUN apt-get update -y && apt-get install -y build-essential libssl-dev \
-    libffi-dev python3-dev libsasl2-dev libldap2-dev
-
-RUN apt-get install -y vim less postgresql-client redis-tools
+RUN apt-get update --fix-missing -y && apt-get install -y \
+    build-essential \
+    bzip2 \
+    ca-certificates \
+    curl \
+    gcc \
+    git \
+    htop \
+    iputils-ping \
+    libffi-dev \
+    libglib2.0-0 \
+    libjpeg8-dev \
+    libldap2-dev \
+    libmysqlclient-dev \
+    libsasl2-2 \
+    libsasl2-dev \
+    libsm6 \
+    libssl-dev \
+    libxext6 \
+    libxml2-dev \
+    libxrender1 \
+    libxslt1-dev \
+    net-tools \
+    postgresql-client \
+    python3-dev \
+    python3-pip \
+    redis-tools \
+    telnet \
+    vim \
+    less \
+    wget \
+    zlib1g-dev
 
 # Install nodejs for custom build
 RUN curl -sL https://deb.nodesource.com/setup_8.x | bash -
@@ -27,29 +57,34 @@ RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -; \
     apt-get update; \
     apt-get install -y yarn
 
+
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
+
+# Install anaconda
+RUN echo 'export PATH=/home/work/conda/bin:$PATH' > /etc/profile.d/conda.sh
+USER work
+
+RUN wget --quiet https://repo.continuum.io/archive/Anaconda3-5.2.0-Linux-x86_64.sh -O ~/anaconda.sh && \
+    /bin/bash ~/anaconda.sh -b -p $HOME/conda && \
+    rm ~/anaconda.sh
+
+RUN $HOME/conda/bin/conda install libgcc
+
+ENV PATH $HOME/conda/bin:$PATH
+
 RUN mkdir $HOME/supernorm
 
 WORKDIR $HOME/supernorm
 
 COPY ./ ./
 
-RUN pip install --upgrade setuptools pip
-RUN pip install -e . && pip install -r requirements-dev.txt
+RUN pip install -r requirements-dev.txt
 
-ENV PATH=/home/work/supernorm/superset/bin:$PATH \
-    PYTHONPATH=./superset/:$PYTHONPATH
+ENV PATH=$HOME/supernorm/superset/bin:$HOME/supernorm/:$PATH \
+    PYTHONPATH=$HOME/supernorm/superset:$HOME/supernorm/norm:$PYTHONPATH
 
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
-
-COPY ./superset ./superset
-RUN chown -R work:work $HOME
-
-USER work
-
-RUN cd superset/assets && yarn
-RUN cd superset/assets && npm run build
 
 HEALTHCHECK CMD ["curl", "-f", "http://localhost:8088/health"]
 
