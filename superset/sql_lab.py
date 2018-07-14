@@ -18,6 +18,7 @@ from superset import app, dataframe, db, results_backend, security_manager, util
 from superset.models.sql_lab import Query
 from superset.sql_parse import SupersetQuery
 from superset.utils import get_celery_app, QueryStatus
+from superset import norm
 
 config = app.config
 celery_app = get_celery_app(config)
@@ -81,7 +82,7 @@ def get_sql_results(
     with session_scope(not ctask.request.called_directly) as session:
 
         try:
-            return execute_sql(
+            return execute_norm(
                 ctask, query_id, rendered_query, return_results, store_results, user_name,
                 session=session)
         except Exception as e:
@@ -93,6 +94,71 @@ def get_sql_results(
             query.tmp_table_name = None
             session.commit()
             raise
+
+
+def execute_norm(ctask, query_id, rendered_query, return_results=True, store_results=False,
+                 user_name=None, session=None):
+    """ Executes the norm script and returns the results"""
+    query = get_query(query_id, session)
+    payload = dict(query_id=query_id)
+
+    def handle_error(msg):
+        """Local method handling error while processing the SQL"""
+        troubleshooting_link = config['TROUBLESHOOTING_LINK']
+        query.error_message = msg
+        query.status = QueryStatus.FAILED
+        query.tmp_table_name = None
+        session.commit()
+        payload.update({
+            'status': query.status,
+            'error': msg,
+        })
+        if troubleshooting_link:
+            payload['link'] = troubleshooting_link
+        return payload
+
+    if store_results and not results_backend:
+        return handle_error("Results backend isn't configured.")
+
+    query.executed_sql = rendered_query
+    query.status = QueryStatus.RUNNING
+    query.start_running_time = utils.now_as_float()
+    session.merge(query)
+    session.commit()
+    logging.info("Set query to 'running'")
+
+    cdf = norm.execute(query, not ctask.request.called_directly, user_name, handle_error)
+
+    if query.status == utils.QueryStatus.STOPPED:
+        return handle_error('The query has been stopped')
+
+    query.rows = cdf.size
+    query.progress = 100
+    query.status = QueryStatus.SUCCESS
+    query.end_time = utils.now_as_float()
+    session.merge(query)
+    session.flush()
+
+    payload.update({
+        'status': query.status,
+        'data': cdf.data if cdf.data else [],
+        'columns': cdf.columns if cdf.columns else [],
+        'query': query.to_dict(),
+    })
+    if store_results:
+        key = '{}'.format(uuid.uuid4())
+        logging.info('Storing results in results backend, key: {}'.format(key))
+        json_payload = json.dumps(payload, default=utils.json_iso_dttm_ser)
+        cache_timeout = config.get('CACHE_DEFAULT_TIMEOUT', 0)
+        results_backend.set(key, utils.zlib_compress(json_payload), cache_timeout)
+        query.results_key = key
+        query.end_result_backend_time = utils.now_as_float()
+
+    session.merge(query)
+    session.commit()
+
+    if return_results:
+        return payload
 
 
 def execute_sql(

@@ -1,8 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import AceEditor from 'react-ace';
-import 'brace/mode/sql';
-import 'brace/theme/github';
+import 'brace/mode/sparql';
+import 'brace/theme/tomorrow';
 import 'brace/ext/language_tools';
 import ace from 'brace';
 import { areArraysShallowEqual } from '../../reduxUtils';
@@ -10,20 +10,19 @@ import { areArraysShallowEqual } from '../../reduxUtils';
 const langTools = ace.acequire('ace/ext/language_tools');
 
 const keywords = (
-  'SELECT|INSERT|UPDATE|DELETE|FROM|WHERE|AND|OR|GROUP|BY|ORDER|LIMIT|OFFSET|HAVING|AS|CASE|' +
-  'WHEN|ELSE|END|TYPE|LEFT|RIGHT|JOIN|ON|OUTER|DESC|ASC|UNION|CREATE|TABLE|PRIMARY|KEY|IF|' +
-  'FOREIGN|NOT|REFERENCES|DEFAULT|NULL|INNER|CROSS|NATURAL|DATABASE|DROP|GRANT|SUM|MAX|MIN|COUNT|' +
-  'AVG|DISTINCT'
+  'import|namespace|delete|del' +
+  'in|!in|max|min|ave|count|group|unique|sort|sample|' +
+  '%python|%keras|%pytorch|' +
+  'true|false|prob|tensor|label|tag|uid|timestamp|none|null|na'
 );
 
 const dataTypes = (
-  'INT|NUMERIC|DECIMAL|DATE|VARCHAR|CHAR|BIGINT|FLOAT|DOUBLE|BIT|BINARY|TEXT|SET|TIMESTAMP|' +
-  'MONEY|REAL|NUMBER|INTEGER'
+  'Integer|Datetime|String|Unicode|Float|Pattern|UUID|URL'
 );
 
 const sqlKeywords = [].concat(keywords.split('|'), dataTypes.split('|'));
 export const sqlWords = sqlKeywords.map(s => ({
-  name: s, value: s, score: 60, meta: 'sql',
+  name: s, value: s, score: 60, meta: 'norm-builtin',
 }));
 
 const propTypes = {
@@ -128,16 +127,26 @@ class AceEditorWrapper extends React.PureComponent {
       const completer = {
         getCompletions: this.getCompletions.bind(this),
       };
+      const normCompleter = {
+          getCompletions: function(editor, session, pos, prefix, callback) {
+              if (prefix.length === 0) { callback(null, []); return }
+              $.getJSON('/sqllab/norm/autocomplete?prefix=' + prefix, function(wordList) {
+                  callback(null, wordList.map(function(ea)  {
+                      return {name: ea.word, value: ea.word, score: ea.score, meta: ea.meta}
+                  }));
+              })
+          }
+      };
       if (langTools) {
-        langTools.setCompleters([completer]);
+        langTools.setCompleters([completer, normCompleter]);
       }
     });
   }
   render() {
     return (
       <AceEditor
-        mode="sql"
-        theme="github"
+        mode="sparql"
+        theme="tomorrow"
         onLoad={this.onEditorLoad.bind(this)}
         onBlur={this.onBlur.bind(this)}
         height={this.props.height}
