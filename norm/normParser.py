@@ -1,4 +1,4 @@
-# Generated from /Users/xumiao/Workspace/titan/superset/superset/norm/norm.g4 by ANTLR 4.7
+# Generated from /home/ax/Workspace/supernorm/norm/norm.g4 by ANTLR 4.7
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO

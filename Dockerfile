@@ -17,6 +17,7 @@ RUN chown -R work:work $HOME
 # Install some dependencies
 # http://airbnb.io/superset/installation.html#os-dependencies
 RUN apt-get update --fix-missing -y && apt-get install -y \
+    apt-utils \
     build-essential \
     bzip2 \
     ca-certificates \
@@ -82,8 +83,8 @@ COPY ./ ./
 
 RUN pip install -r requirements-dev.txt
 
-ENV PATH=$HOME/supernorm/superset/bin:$HOME/supernorm/:$PATH \
-    PYTHONPATH=$HOME/supernorm/superset:$HOME/supernorm/norm:$PYTHONPATH
+ENV PATH=$HOME/supernorm/superset/bin:$HOME/supernorm/:/opt/conda/bin:$PATH \
+    PYTHONPATH=$HOME/supernorm/:$PYTHONPATH
 
 
 HEALTHCHECK CMD ["curl", "-f", "http://localhost:8088/health"]

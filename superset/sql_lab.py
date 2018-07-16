@@ -18,7 +18,8 @@ from superset import app, dataframe, db, results_backend, security_manager, util
 from superset.models.sql_lab import Query
 from superset.sql_parse import SupersetQuery
 from superset.utils import get_celery_app, QueryStatus
-from superset import norm
+
+import norm
 
 config = app.config
 celery_app = get_celery_app(config)

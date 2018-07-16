@@ -1,4 +1,4 @@
-# Generated from /Users/xumiao/Workspace/titan/superset/superset/norm/norm.g4 by ANTLR 4.7
+# Generated from /home/ax/Workspace/supernorm/norm/norm.g4 by ANTLR 4.7
 from antlr4 import *
 if __name__ is not None and "." in __name__:
     from .normParser import normParser

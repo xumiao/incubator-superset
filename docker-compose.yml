@@ -7,6 +7,15 @@ services:
       - 6379:6379
     volumes:
       - redis:/data
+
+  npm-build:
+    image: supernorm
+    volumes:
+      - .:/home/work/supernorm
+      - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
+      - superset-dist:/home/work/supernorm/superset/assets/dist
+    command: ["/bin/bash", "npm-build.sh"]
+
   supernorm:
     image: supernorm
     restart: always
@@ -22,10 +31,11 @@ services:
       SUPERSET_ENV: local
     ports:
       - 8088:8088
-    command: "tail -f /dev/null"
+    command: ""
     network_mode: host
     depends_on:
       - redis
+      - npm-build
     volumes:
       - .:/home/work/supernorm
       - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
@@ -34,3 +44,6 @@ volumes:
     external: false
   superset-node-modules:
     external: false
+  superset-dist:
+    external: false
+
