@@ -4,12 +4,10 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from datetime import datetime, timezone
 from textwrap import dedent
 
 from future.standard_library import install_aliases
 
-from flask import escape, Markup
 from flask_appbuilder import Model
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Enum, DateTime
@@ -22,7 +20,7 @@ from superset import app, db, utils
 from superset import security_manager as sm
 
 from superset.models.helpers import AuditMixinNullable
-from superset.norm.helpers import VersionedMixin, lazy_property, ParametrizedMixin, register_parameter
+from norm.helpers import VersionedMixin, lazy_property, ParametrizedMixin, register_parameter
 from superset.models.core import metadata
 
 from pandas import DataFrame
@@ -250,8 +248,7 @@ class NativeLambda(Lambda):
                                      variables=[Variable('', T)])
 
 
-T = NativeLambda(name='Any', version=1, description='Any type')
-
+T = NativeLambda(name='Type', version=1, description='A logical function')
 BO = NativeLambda(name='Boolean', version=1, description='Boolean, true/false, 1/0')
 IN = NativeLambda(name='Integer', version=1, description='Integer, -inf..+inf')
 ST = NativeLambda(name='String', version=1, description='String, "blahblah"')
@@ -260,4 +257,5 @@ PA = NativeLambda(name='Pattern', version=1, description='Pattern, r"^test[0-9]+
 UU = NativeLambda(name='UUID', version=1, description='UUID, $"sfsfsfsf"')
 UR = NativeLambda(name='URL', version=1, description='URL, l"http://example.com"')
 DA = NativeLambda(name='Datetime', version=1, description='Datetime, t"2018-09-01"')
+Any = NativeLambda(name='Any', version=1, description='Any type')
 

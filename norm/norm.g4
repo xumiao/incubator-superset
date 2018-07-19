@@ -7,29 +7,20 @@ script
 statement
     : comments
     | namespaceExpression WSS* SEMICOLON
-    | typeDeclaration WSS* SEMICOLON
+    | declarationExpression WSS* SEMICOLON
     | updateExpression WSS* SEMICOLON
-    | queryExpression WSS* SEMICOLON
     | deleteExpression WSS* SEMICOLON
+    | queryExpression WSS* SEMICOLON
     ;
 
-COMMENT
-    : '//' ~[\r\n]* -> skip
-    ;
+COMMENT: '//' ~[\r\n]*;
 
-comments
-    : '/*' comment_contents '*/'
-    | COMMENT
-    ;
+comments: '/*' comment_contents '*/' | COMMENT;
 
-comment_contents
-    : ~('*/')*?
-    ;
+comment_contents: ~('*/')+;
 
-namespaceExpression
-    : namespace WSS*
-    | imports WSS*
-    ;
+namespaceExpression: namespace | imports;
+
 namespace_name: VARNAME (DOT VARNAME)*;
 
 namespace: SPACED_NAMESPACE namespace_name;
@@ -40,169 +31,95 @@ imports: SPACED_IMPORT namespace_name;
 
 SPACED_IMPORT: 'import' [ \t]*;
 
+declarationExpression: fullTypeDeclaration | incrementalTypeDeclaration;
 
-typeDeclaration
-    : anonymousTypeDeclaration
-    | fullTypeDeclaration
-    | incrementalTypeDeclaration
-    ;
+typeDefinition: typeName (LBR argumentDeclarations RBR)? (CL typeName)?;
 
-anonymousTypeDeclaration
-    : LCBR queryExpression RCBR
-    | LBR  RBR CL typeExpression AS LCBR queryExpression RCBR
-    | LBR argumentDeclarations RBR (CL typeExpression)* AS LCBR queryExpression RCBR
-    ;
-
-typeDefinition
-    : typeName LBR RBR CL typeExpression
-    | typeName LBR argumentDeclarations RBR (CL typeExpression)*
-    ;
-
-fullTypeDeclaration : typeDefinition AS typeImplementation;
-
-incrementalTypeDeclaration
-    : typeName ORAS typeImplementation
-    ;
-
-ORAS : [ \t\u000C]* OR '=' [ \t\u000C\r\n]*;
-
-
-typeImplementation
-    : queryExpression
-    | LCBR queryExpression* RCBR
-    | kerasImplementation
-    | pythonImplementation
-    ;
-
-kerasImplementation
-    : '{%keras' code '%}'
-    ;
-
-pythonImplementation
-    : '{%python' code '%}'
-    ;
-
-code
-    : ~('%}')*?
-    ;
-
-argumentDeclaration
-    : typeExpression
-    | variableName CL typeExpression
-    ;
+argumentDeclaration: variableName CL typeName;
 
 argumentDeclarations: argumentDeclaration (CA argumentDeclaration)*;
 
-version
-    : '@' INTEGER
-    | '@' INTEGER DOT UUID
+fullTypeDeclaration : typeDefinition AS typeImplementation;
+
+incrementalTypeDeclaration: typeName ORAS typeImplementation;
+
+ORAS : [ \t\u000C]* OR '=' [ \t\u000C\r\n]*;
+
+typeImplementation
+    : LCBR code RCBR
+    | KERAS_BLOCK code BLOCK_END
+    | PYTHON_BLOCK code BLOCK_END
     ;
 
-typeName : TYPENAME | TYPENAME version;
-variableName : VARNAME | nativeProperty;
+KERAS_BLOCK : '{%keras';
 
-typeExpression
-    : typeName
-    | typeName LCBR argumentExpressions RCBR
-    ;
+PYTHON_BLOCK : '{%python';
 
-typeEvaluation
-    : typeExpression LBR RBR
-    | typeExpression LBR argumentExpressions RBR
-    | typeExpression LBR argumentExpressions RBR queryTerm
-    | variableName LBR RBR
-    | variableName LBR argumentExpressions RBR
-    | variableName LBR argumentExpressions RBR queryTerm
-    ;
+BLOCK_END : '%}';
 
-querySign: '?' | '?' queryLimit | '?*';
+code: ~(BLOCK_END)*?;
 
-queryTerm
-    : querySign
-    | querySign variableName (DOT variableName)*
-    ;
+version: '@' INTEGER (DOT UUID)?;
 
-queryLimit : INTEGER;
+typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName OR typeName;
 
-queryConstraints
-    : queryContraint (spacedLogicalOperator queryContraint)*
-    | LBR queryConstraints RBR
-    ;
+variableName : (VARNAME DOT)? (VARNAME | nativeProperty);
 
-queryContraint: variableName spacedConstraintOperator queryExpression;
+querySign: '?' queryLimit?;
 
+queryLimit : INTEGER | '*';
+
+queryProjection: querySign variableName?;
 
 argumentExpressions : argumentExpression (CA argumentExpression)*;
 
-argumentExpression
-    : argumentAssignmentExpression
-    | constraintExpression
-    ;
+argumentExpression: queryExpression | queryExpression? queryProjection;
 
-argumentAssignmentExpression
-    : assignmentExpression
-    | queryExpression
-    ;
+SPACED_UPDATE: 'update' [ \t]*;
 
-constraintExpression
-    : queryConstraints
-    | LBR queryConstraints RBR queryTerm
-    | queryTerm
-    ;
+updateExpression: SPACED_UPDATE queryExpression;
 
-updateExpression
-    : queryExpression DOT propertyAggregation AS queryExpression
-    | typeName LBR RBR DOT
-    | typeName LBR argumentAssignmentExpression (CA argumentAssignmentExpression)* RBR DOT
-    ;
-
-SPACED_DELETE: 'del' [ \t]* | 'delete' [\t]*;
+SPACED_DELETE: 'delete' [ \t]*;
 
 deleteExpression: SPACED_DELETE queryExpression;
 
 queryExpression
     : baseExpression
-    | embracedExpression
-    | queryExpression WSS* DOT WSS* propertyAggregation
+    | LBR queryExpression RBR
+    | queryExpression WSS* DOT WSS* (variableName | aggregationFunction LBR argumentExpressions? RBR)
+    | evaluationExpression
     | listExpression
+    | arithmeticExpression
     | assignmentExpression
+    | conditionExpression
     | NT queryExpression
     | queryExpression spacedLogicalOperator queryExpression
     ;
 
-baseExpression
+baseExpression: constant | variableName | typeName;
+
+listExpression : LSBR (queryExpression (CA queryExpression)*)? RSBR;
+
+evaluationExpression: (typeName | variableName) LBR argumentExpressions? RBR queryProjection?;
+
+arithmeticExpression
     : constant
     | variableName
-    | typeEvaluation
-    | typeExpression
+    | '-' arithmeticExpression
+    | arithmeticExpression spacedArithmeticOperator arithmeticExpression
+    | LBR arithmeticExpression RBR
     ;
 
-embracedExpression : LBR queryExpression RBR;
+assignmentExpression
+    : variableName AS queryExpression
+    | variableName AS arithmeticExpression
+    ;
 
-listExpression : LSBR queryExpression (CA queryExpression)* RSBR;
-
-assignmentExpression : variableName AS queryExpression;
+conditionExpression: arithmeticExpression spacedConditionOperator queryExpression;
 
 nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'timestamp' | 'version';
 
-propertyAggregation : nativeProperty | variableName | aggregationEvaluation;
-
 aggregationFunction : 'max' | 'min' | 'ave' | 'count' | 'group' | 'unique' | 'sort' | 'sample';
-
-aggregationEvaluation
-    : aggregationFunction LBR RBR
-    | aggregationFunction LBR aggregationArgumentExpressions RBR
-    ;
-
-aggregationArgumentExpression
-    : variableName AS constant
-    | variableName AS variableName
-    | variableName AS aggregationFunction
-    ;
-
-aggregationArgumentExpressions
-    : aggregationArgumentExpression (CA aggregationArgumentExpression)*
-    ;
 
 none: 'none' | 'null' | 'na';
 
@@ -218,6 +135,18 @@ constant
     | URL
     | DATETIME
     ;
+
+logicalOperator: AND | OR | XOR | IMP | EQV;
+
+spacedLogicalOperator: WSS? logicalOperator WSS?;
+
+conditionOperator: EQ | NE | IN | NIN | LT | LE | GT | GE | LIKE;
+
+spacedConditionOperator: WSS? conditionOperator WSS?;
+
+arithmeticOperator: PLUS | MINUS | TIMES | DIVIDE | MOD;
+
+spacedArithmeticOperator: WSS? arithmeticOperator WSS?;
 
 WSS: [ \t\u000C\r\n]+;
 
@@ -238,36 +167,9 @@ CL: [ \t\u000C\r\n]* COLON [ \t\u000C\r\n]*;
 
 AS: [ \t\u000C\r\n]* '=' [ \t\u000C\r\n]*;
 
-logicalOperator: AND | OR | XOR | IMP | EQV;
-
-spacedLogicalOperator
-    : logicalOperator
-    | logicalOperator WSS
-    | WSS logicalOperator
-    | WSS logicalOperator WSS
-    ;
-
-constraintOperator: EQ | NE | IN | NIN | LT | LE | GT | GE | LIKE;
-
-spacedConstraintOperator
-    : constraintOperator
-    | constraintOperator WSS
-    | WSS constraintOperator
-    | WSS constraintOperator WSS
-    ;
-
-arithmeticOperator: PLUS | MINUS | TIMES | DIVIDE | MOD;
-
-spacedArithmeticOperator
-    : arithmeticOperator
-    | arithmeticOperator WSS
-    | WSS arithmeticOperator
-    | WSS arithmeticOperator WSS
-    ;
-
 IN:        'in';
 NIN:       '!in';
-AND:       '&' | '&&';
+AND:       '&';
 COLON:     ':';
 COMMA:     ',';
 DIVIDE:    '/';
@@ -282,7 +184,7 @@ MINUS:     '-';
 MOD:       '%';
 NOT:       '!';
 NE:        '!=';
-OR:        '|' | '||';
+OR:        '|';
 PLUS:      '+';
 SEMICOLON: ';';
 LIKE:      '~';
