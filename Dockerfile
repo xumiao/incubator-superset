@@ -89,6 +89,4 @@ ENV PATH=$HOME/supernorm/superset/bin:$HOME/supernorm/:/opt/conda/bin:$PATH \
 
 HEALTHCHECK CMD ["curl", "-f", "http://localhost:8088/health"]
 
-ENTRYPOINT ["docker-entrypoint.sh"]
-
 EXPOSE 8088
