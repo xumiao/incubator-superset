@@ -10,8 +10,7 @@ ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     HOME=/home/work
 
-COPY ./superset ./superset
-COPY ./norm ./norm
+COPY ./ $HOME/supernorm/
 RUN chown -R work:work $HOME
 
 # Install some dependencies
@@ -59,10 +58,6 @@ RUN curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | apt-key add -; \
     apt-get install -y yarn
 
 
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh # backwards compat
-
 # Install anaconda
 RUN echo 'export PATH=/home/work/conda/bin:$PATH' > /etc/profile.d/conda.sh
 USER work
@@ -75,11 +70,7 @@ RUN $HOME/conda/bin/conda install libgcc
 
 ENV PATH $HOME/conda/bin:$PATH
 
-RUN mkdir $HOME/supernorm
-
 WORKDIR $HOME/supernorm
-
-COPY ./ ./
 
 RUN pip install -r requirements-dev.txt
 

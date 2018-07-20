@@ -31,7 +31,7 @@ services:
       SUPERSET_ENV: local
     ports:
       - 8088:8088
-    command: ["docker-entrypoint.sh"]
+    command: ["/bin/bash", "supernorm-ui-serve.sh"]
     network_mode: host
     depends_on:
       - redis
@@ -39,6 +39,7 @@ services:
     volumes:
       - .:/home/work/supernorm
       - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
+      - superset-dist:/home/work/supernorm/superset/assets/dist
 
 volumes:
   redis:
@@ -46,5 +47,5 @@ volumes:
   superset-node-modules:
     external: false
   superset-dist:
-    external: false
+    external: true
 

@@ -52,3 +52,6 @@ class CeleryConfig(object):
 
 
 CELERY_CONFIG = CeleryConfig
+
+APP_NAME = 'SuperNorm'
+APP_ICON = '/static/assets/images/supernorm-logo@2x.png'

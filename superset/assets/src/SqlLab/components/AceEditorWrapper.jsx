@@ -10,7 +10,7 @@ import { areArraysShallowEqual } from '../../reduxUtils';
 const langTools = ace.acequire('ace/ext/language_tools');
 
 const keywords = (
-  'import|namespace|delete|del' +
+  'import|namespace|delete|update|' +
   'in|!in|max|min|ave|count|group|unique|sort|sample|' +
   '%python|%keras|%pytorch|' +
   'true|false|prob|tensor|label|tag|uid|timestamp|none|null|na'
