@@ -13,6 +13,7 @@ superset/bin/supersetc
 env_py3
 envpy3
 .eggs
+.cache
 build
 *.db
 tmp

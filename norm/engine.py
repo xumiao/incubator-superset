@@ -22,6 +22,8 @@ ListType = namedtuple('ListType', ['intern'])
 UnionType = namedtuple('UnionType', ['types'])
 TypeDefinition = namedtuple('TypeDefinition', ['type_name', 'argument_declarations', 'output_type_name'])
 TypeImpl = namedtuple('TypeImpl', ['mode', 'code'])
+ArgumentDeclaration = namedtuple('ArgumentDeclaration', ['variable_name', 'variable_type'])
+ArgumentDeclarations = namedtuple('ArgumentDeclarations', ['arguments'])
 
 
 class NormExecutor(normListener):
@@ -47,7 +49,8 @@ class NormExecutor(normListener):
     def exitTypeName(self, ctx:normParser.TypeNameContext):
         typename = ctx.TYPENAME()
         if typename:
-            self.stack.append(TypeName(self.namespace, typename, ctx.version()))
+            version = ctx.version().getText() if ctx.version() else None
+            self.stack.append(TypeName(self.namespace, str(typename), version))
         elif ctx.LSBR():
             self.stack.append(ListType(self.stack.pop()))
         elif ctx.OR():
@@ -65,6 +68,21 @@ class NormExecutor(normListener):
             self.stack.append(t)
         else:
             raise ValueError('Not a valid type name definition')
+
+    def exitVariableName(self, ctx:normParser.VariableNameContext):
+        self.stack.append(ctx.getText())
+
+    def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
+        variable_name = self.stack.pop()
+        type_name = self.stack.pop()
+        self.stack.append(ArgumentDeclaration(variable_name, type_name))
+
+    def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):
+        arguments = []
+        for arg in ctx.children:
+            if isinstance(arg, normParser.ArgumentDeclarationContext):
+                arguments.append(self.stack.pop())
+        self.stack.append(ArgumentDeclarations(list(reversed(arguments))))
 
     def exitTypeDefinition(self, ctx:normParser.TypeDefinitionContext):
         output_type_name = None
