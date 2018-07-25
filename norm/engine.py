@@ -24,6 +24,8 @@ TypeDefinition = namedtuple('TypeDefinition', ['type_name', 'argument_declaratio
 TypeImpl = namedtuple('TypeImpl', ['mode', 'code'])
 ArgumentDeclaration = namedtuple('ArgumentDeclaration', ['variable_name', 'variable_type'])
 ArgumentDeclarations = namedtuple('ArgumentDeclarations', ['arguments'])
+FullTypeDeclaration = namedtuple('FullTypeDeclaration', ['type_definition', 'type_implementation'])
+IncrementalTypeDeclaration = namedtuple('IcrementalTypeDeclaration', ['type_name', 'type_implementation'])
 
 
 class NormExecutor(normListener):
@@ -34,17 +36,26 @@ class NormExecutor(normListener):
         self.stack = []
         self.results = None
 
+    def exitDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
+        type_declaration = self.stack.pop()
+        if isinstance(type_declaration, FullTypeDeclaration):
+            # TODO declare type
+            pass
+        elif isinstance(type_declaration, IncrementalTypeDeclaration):
+            # TODO add on type
+            pass
+        else:
+            raise ValueError('Wrong declaration syntax')
+
     def exitFullTypeDeclaration(self, ctx: normParser.FullTypeDeclarationContext):
         type_implementation = self.stack.pop()
         type_definition = self.stack.pop()
-        # TODO create a type and push it back to the stack
-        self.stack.append('Type {} is created'.format(type_definition))
+        self.stack.append(FullTypeDeclaration(type_definition, type_implementation))
 
     def exitIncrementalTypeDeclaration(self, ctx:normParser.IncrementalTypeDeclarationContext):
         type_implementation = self.stack.pop()
         type_name = self.stack.pop()
-        # TODO update the type with additional implementation
-        self.stack.append('Type {} is updated'.format(type_name))
+        self.stack.append(IncrementalTypeDeclaration(type_name, type_implementation))
 
     def exitTypeName(self, ctx:normParser.TypeNameContext):
         typename = ctx.TYPENAME()
@@ -179,3 +190,8 @@ def compile_norm(script, last=True):
     ParseTreeWalker().walk(executor, tree)
     return executor
 
+
+from superset import db
+test = db.Table('test', db.Column('test1', db.Integer), primary_key=True)
+
+db.session.query(test).filter(test.test1==2)

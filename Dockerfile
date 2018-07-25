@@ -10,6 +10,7 @@ ENV LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     HOME=/home/work
 
+# Copy code over
 COPY ./ $HOME/supernorm/
 RUN chown -R work:work $HOME
 
@@ -72,6 +73,7 @@ ENV PATH $HOME/conda/bin:$PATH
 
 WORKDIR $HOME/supernorm
 
+# Install requirements
 RUN pip install -r requirements-dev.txt
 
 ENV PATH=$HOME/supernorm/superset/bin:$HOME/supernorm/:/opt/conda/bin:$PATH \
