@@ -7,7 +7,17 @@ services:
       - 6379:6379
     volumes:
       - redis:/data
-
+  postgres:
+    image: postgres:10.4
+    restart: always
+    environment:
+      POSTGRES_DB: superset
+      POSTGRES_PASSWORD: superset
+      POSTGRES_USER: superset
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
   npm-build:
     image: supernorm
     volumes:
@@ -15,17 +25,16 @@ services:
       - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
       - superset-dist:/home/work/supernorm/superset/assets/dist
     command: ["/bin/bash", "npm-build.sh"]
-
   supernorm:
     image: supernorm
     restart: always
     environment:
       SUPERSET_CONFIG_PATH: /home/work/supernorm/supernorm_config.py
-      MYSQL_DB: superset
-      MYSQL_USER: root
-      MYSQL_PASSWORD: root
-      MYSQL_HOST: 127.0.0.1
-      MYSQL_PORT: 3306
+      POSTGRES_DB: superset
+      POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
       REDIS_HOST: redis
       REDIS_PORT: 6379
       SUPERSET_ENV: local
@@ -40,8 +49,9 @@ services:
       - .:/home/work/supernorm
       - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
       - superset-dist:/home/work/supernorm/superset/assets/dist
-
 volumes:
+  postgres:
+    external: true
   redis:
     external: false
   superset-node-modules:
