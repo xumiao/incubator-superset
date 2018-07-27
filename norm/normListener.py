@@ -1,4 +1,4 @@
-# Generated from /home/ax/Workspace/supernorm/norm/norm.g4 by ANTLR 4.7
+# Generated from /Users/xumiao/Workspace/supernorm/norm/norm.g4 by ANTLR 4.7
 from antlr4 import *
 if __name__ is not None and "." in __name__:
     from .normParser import normParser
@@ -338,6 +338,87 @@ class normListener(ParseTreeListener):
 
     # Exit a parse tree produced by normParser#constant.
     def exitConstant(self, ctx:normParser.ConstantContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#bool_c.
+    def enterBool_c(self, ctx:normParser.Bool_cContext):
+        pass
+
+    # Exit a parse tree produced by normParser#bool_c.
+    def exitBool_c(self, ctx:normParser.Bool_cContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#integer_c.
+    def enterInteger_c(self, ctx:normParser.Integer_cContext):
+        pass
+
+    # Exit a parse tree produced by normParser#integer_c.
+    def exitInteger_c(self, ctx:normParser.Integer_cContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#float_c.
+    def enterFloat_c(self, ctx:normParser.Float_cContext):
+        pass
+
+    # Exit a parse tree produced by normParser#float_c.
+    def exitFloat_c(self, ctx:normParser.Float_cContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#string_c.
+    def enterString_c(self, ctx:normParser.String_cContext):
+        pass
+
+    # Exit a parse tree produced by normParser#string_c.
+    def exitString_c(self, ctx:normParser.String_cContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#unicode_c.
+    def enterUnicode_c(self, ctx:normParser.Unicode_cContext):
+        pass
+
+    # Exit a parse tree produced by normParser#unicode_c.
+    def exitUnicode_c(self, ctx:normParser.Unicode_cContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#pattern.
+    def enterPattern(self, ctx:normParser.PatternContext):
+        pass
+
+    # Exit a parse tree produced by normParser#pattern.
+    def exitPattern(self, ctx:normParser.PatternContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#uuid.
+    def enterUuid(self, ctx:normParser.UuidContext):
+        pass
+
+    # Exit a parse tree produced by normParser#uuid.
+    def exitUuid(self, ctx:normParser.UuidContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#url.
+    def enterUrl(self, ctx:normParser.UrlContext):
+        pass
+
+    # Exit a parse tree produced by normParser#url.
+    def exitUrl(self, ctx:normParser.UrlContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#datetime.
+    def enterDatetime(self, ctx:normParser.DatetimeContext):
+        pass
+
+    # Exit a parse tree produced by normParser#datetime.
+    def exitDatetime(self, ctx:normParser.DatetimeContext):
         pass
 
 

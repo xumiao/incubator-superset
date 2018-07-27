@@ -59,7 +59,7 @@ BLOCK_END : '%}';
 
 code: ~(BLOCK_END)*?;
 
-version: '@' INTEGER (DOT UUID)?;
+version: '@' INTEGER (DOT uuid)?;
 
 typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName OR typeName;
 
@@ -125,16 +125,26 @@ none: 'none' | 'null' | 'na';
 
 constant
     : none
-    | BOOLEAN
-    | INTEGER
-    | FLOAT
-    | STRING
-    | UNICODE
-    | PATTERN
-    | UUID
-    | URL
-    | DATETIME
+    | bool_c
+    | integer_c
+    | float_c
+    | string_c
+    | unicode_c
+    | pattern
+    | uuid
+    | url
+    | datetime
     ;
+
+bool_c:      BOOLEAN;
+integer_c:   INTEGER;
+float_c:     FLOAT;
+string_c:    STRING;
+unicode_c:   'u' STRING;
+pattern:   'r' STRING;
+uuid:      '$' STRING;
+url:       'l' STRING;
+datetime:  't' STRING;
 
 logicalOperator: AND | OR | XOR | IMP | EQV;
 
@@ -197,12 +207,7 @@ BOOLEAN:    'true' | 'false';
 INTEGER:    DIGIT+;
 FLOAT:      [+-]? DIGIT+ DOT DIGIT+ ('e' [+-]? DIGIT+)?;
 NEWLINE:    '\r'? '\n';
-STRING:     '"' ( ~["\r\n\t] )+? '"' | '\'' ( ~['\r\n\t] )+? '\'' ;
-UNICODE:    'u' STRING;
-PATTERN:    'r' STRING;
-UUID:       '$' STRING;
-URL:        'l' STRING;
-DATETIME:   't' STRING;
+STRING:     '"' ( ~["\r\n\t] )*? '"' | '\'' ( ~['\r\n\t] )*? '\'' ;
 
 fragment DIGIT:      [0] | NONZERO;
 fragment NONZERO:    [1-9];

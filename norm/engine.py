@@ -1,5 +1,7 @@
 from antlr4 import *
 from collections import namedtuple
+import re
+from dateutil import parser as dateparser
 from norm.normLexer import normLexer
 from norm.normParser import normParser
 from norm.normListener import normListener
@@ -17,24 +19,76 @@ class NormErrorListener(ErrorListener):
         raise ValueError(err_msg)
 
 
-TypeName = namedtuple('TypeName', ['namespace', 'name', 'version'])
+TypeName = namedtuple('TypeName', ['name', 'version'])
 ListType = namedtuple('ListType', ['intern'])
 UnionType = namedtuple('UnionType', ['types'])
 TypeDefinition = namedtuple('TypeDefinition', ['type_name', 'argument_declarations', 'output_type_name'])
 TypeImpl = namedtuple('TypeImpl', ['mode', 'code'])
 ArgumentDeclaration = namedtuple('ArgumentDeclaration', ['variable_name', 'variable_type'])
 ArgumentDeclarations = namedtuple('ArgumentDeclarations', ['arguments'])
-FullTypeDeclaration = namedtuple('FullTypeDeclaration', ['type_definition', 'type_implementation'])
+FullTypeDeclaration = namedtuple('FullTypeDeclaration', ['namespace', 'type_definition', 'type_implementation'])
 IncrementalTypeDeclaration = namedtuple('IcrementalTypeDeclaration', ['type_name', 'type_implementation'])
+Constant = namedtuple('Constant', ['type_name', 'value'])
+BaseExpr = namedtuple('BaseExpr', ['type_name', 'value'])
+ListExpr = namedtuple('ListExpr', ['elements'])
 
 
-class NormExecutor(normListener):
+class NormCompiler(normListener):
     def __init__(self):
         self.comments = ''
         self.imports = []
         self.namespace = ''
         self.stack = []
-        self.results = None
+
+    def exitNone(self, ctx:normParser.NoneContext):
+        self.stack.append(Constant('none', None))
+
+    def exitBool_c(self, ctx:normParser.Bool_cContext):
+        self.stack.append(Constant('bool', ctx.getText().lower() == 'true'))
+
+    def exitInteger_c(self, ctx:normParser.Integer_cContext):
+        self.stack.append(Constant('int', int(ctx.getText())))
+
+    def exitFloat_c(self, ctx:normParser.Float_cContext):
+        self.stack.append(Constant('float', float(ctx.getText())))
+
+    def exitString_c(self, ctx:normParser.String_cContext):
+        self.stack.append(Constant('string', str(ctx.getText()[1:-1])))
+
+    def exitUnicode_c(self, ctx:normParser.Unicode_cContext):
+        self.stack.append(Constant('unicode', str(ctx.getText()[2:-1]).encode('utf-8', 'ignore')))
+
+    def exitPattern(self, ctx:normParser.PatternContext):
+        try:
+            self.stack.append(Constant('pattern', re.compile(str(ctx.getText()[2:-1]))))
+        except:
+            raise ValueError('Pattern constant {} is in wrong format, should be Python regex pattern'
+                             .format(ctx.getText()))
+
+    def exitUuid(self, ctx:normParser.UuidContext):
+        self.stack.append(Constant('uuid', str(ctx.getText()[2:-1])))
+
+    def exitUrl(self, ctx:normParser.UrlContext):
+        self.stack.append(Constant('url', str(ctx.getText()[2:-1])))
+
+    def exitDatetime(self, ctx:normParser.DatetimeContext):
+        self.stack.append(Constant('datetime', dateparser.parse(ctx.getText()[2:-1], fuzzy=True)))
+
+    def exitBaseExpression(self, ctx:normParser.BaseExpressionContext):
+        obj = self.stack.pop()
+        if isinstance(obj, Constant):
+            self.stack.append(BaseExpr('constant', obj))
+        elif isinstance(obj, TypeName):
+            self.stack.append(BaseExpr('type', obj))
+        else:
+            self.stack.append(BaseExpr('variable', obj))
+
+    def exitListExpression(self, ctx:normParser.ListExpressionContext):
+        exprs = []
+        for ch in ctx.children:
+            if isinstance(ch, normParser.QueryExpressionContext):
+                exprs.append(self.stack.pop())
+        self.stack.append(ListExpr(exprs))
 
     def exitDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
         type_declaration = self.stack.pop()
@@ -50,7 +104,7 @@ class NormExecutor(normListener):
     def exitFullTypeDeclaration(self, ctx: normParser.FullTypeDeclarationContext):
         type_implementation = self.stack.pop()
         type_definition = self.stack.pop()
-        self.stack.append(FullTypeDeclaration(type_definition, type_implementation))
+        self.stack.append(FullTypeDeclaration(self.namespace, type_definition, type_implementation))
 
     def exitIncrementalTypeDeclaration(self, ctx:normParser.IncrementalTypeDeclarationContext):
         type_implementation = self.stack.pop()
@@ -61,7 +115,7 @@ class NormExecutor(normListener):
         typename = ctx.TYPENAME()
         if typename:
             version = ctx.version().getText() if ctx.version() else None
-            self.stack.append(TypeName(self.namespace, str(typename), version))
+            self.stack.append(TypeName(str(typename), version))
         elif ctx.LSBR():
             self.stack.append(ListType(self.stack.pop()))
         elif ctx.OR():
@@ -125,11 +179,6 @@ class NormExecutor(normListener):
         # TODO delete the query result from the database
         self.stack.append('Data {} for type {} have been deleted as version {}')
 
-    def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
-        query_expression = self.stack.pop()
-        # TODO execute the query
-        self.stack.append('Query result')
-
     def exitComment_contents(self, ctx: normParser.Comment_contentsContext):
         self.comments += ctx.getText()
 
@@ -186,12 +235,7 @@ def compile_norm(script, last=True):
     parser = normParser(stream)
     parser.addErrorListener(NormErrorListener())
     tree = parser.script()
-    executor = NormExecutor()
-    ParseTreeWalker().walk(executor, tree)
-    return executor
+    compiler = NormCompiler()
+    ParseTreeWalker().walk(compiler, tree)
+    return compiler
 
-
-from superset import db
-test = db.Table('test', db.Column('test1', db.Integer), primary_key=True)
-
-db.session.query(test).filter(test.test1==2)
