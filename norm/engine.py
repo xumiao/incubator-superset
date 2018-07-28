@@ -5,7 +5,7 @@ from dateutil import parser as dateparser
 from norm.normLexer import normLexer
 from norm.normParser import normParser
 from norm.normListener import normListener
-
+from norm import config
 from antlr4.error.ErrorListener import ErrorListener
 
 
@@ -28,9 +28,22 @@ ArgumentDeclaration = namedtuple('ArgumentDeclaration', ['variable_name', 'varia
 ArgumentDeclarations = namedtuple('ArgumentDeclarations', ['arguments'])
 FullTypeDeclaration = namedtuple('FullTypeDeclaration', ['namespace', 'type_definition', 'type_implementation'])
 IncrementalTypeDeclaration = namedtuple('IcrementalTypeDeclaration', ['type_name', 'type_implementation'])
+Projection = namedtuple('Projection', ['limit', 'variable_name'])
 Constant = namedtuple('Constant', ['type_name', 'value'])
 BaseExpr = namedtuple('BaseExpr', ['type_name', 'value'])
 ListExpr = namedtuple('ListExpr', ['elements'])
+ArgumentExpr = namedtuple('ArgumentExpr', ['expr', 'projection'])
+EvaluationExpr = namedtuple('EvaluationExpr', ['type_name', 'variable_name', 'args', 'projection'])
+ArithmeticExpr = namedtuple('ArithmeticExpr', ['op', 'expr1', 'expr2'])
+AssignmentExpr = namedtuple('AssignmentExpr', ['variable_name', 'expr'])
+ConditionExpr = namedtuple('ConditionExpr', ['aexpr', 'op', 'qexpr'])
+CombinedExpr = namedtuple('CombinedExpr', ['op', 'expr1', 'expr2'])
+PropertyExpr = namedtuple('PropertyExpr', ['expr', 'property'])
+AggregationExpr = namedtuple('AggregationExpr', ['expr', 'func', 'args'])
+
+
+class ParseError(ValueError):
+    pass
 
 
 class NormCompiler(normListener):
@@ -83,12 +96,112 @@ class NormCompiler(normListener):
         else:
             self.stack.append(BaseExpr('variable', obj))
 
+    def exitQueryLimit(self, ctx:normParser.QueryLimitContext):
+        lmt = ctx.getText()
+        if lmt == '*':
+            self.stack.append(config.MAX_LIMIT)
+            return
+
+        try:
+            lmt = int(lmt)
+            if lmt < 0:
+                raise ValueError('Query limit must be positive integer, but we get {}'.format(lmt))
+        except:
+            raise ValueError('Query limit must be positive integer, but we get {}'.format(lmt))
+        self.stack.append(lmt)
+
+    def exitQueryProjection(self, ctx:normParser.QueryProjectionContext):
+        variable = self.stack.pop() if ctx.variableName() else None
+        lmt = self.stack.pop() if ctx.querySign().queryLimit() else None
+        self.stack.append(Projection(lmt, variable))
+
+    def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
+        projection = self.stack.pop() if ctx.queryProjection() else None
+        expr = self.stack.pop() if ctx.queryExpression() else None
+        # TODO check whether it is a query expression
+        self.stack.append(ArgumentExpr(expr, projection))
+
+    def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
+        args = []
+        for ch in ctx.children:
+            if isinstance(ch, normParser.ArgumentExpressionContext):
+                args.append(self.stack.pop())
+        if not all([isinstance(arg, ArgumentExpr) for arg in args]):
+            raise ParseError('Parsing Error, not all arguments parsed correctly')
+        self.stack.append(ListExpr(list(reversed(args))))
+
+    def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
+        projection = self.stack.pop() if ctx.queryProjection() else None
+        args = self.stack.pop() if ctx.argumentExpressions() else []
+        variable_name = self.stack.pop() if ctx.variableName() else None
+        type_name = self.stack.pop() if ctx.typeName() else None
+        self.stack.append(EvaluationExpr(type_name, variable_name, args, projection))
+
+    def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
+        if ctx.constant():
+            if not isinstance(self.stack[-1], Constant):
+                raise ParseError('It is supposed to be a constant not {}'.format(self.stack[-1]))
+            if self.stack[-1].type_name not in {'int', 'float', 'bool'}:
+                raise ValueError('Arithmetic can only work with numeric constant')
+            return
+        if ctx.variableName():
+            # TODO check the variable to be numeric type
+            return
+        if ctx.listExpression():
+            # TODO check the elements to be numeric type
+            return
+        if ctx.LBR():
+            return
+        if ctx.MINUS():
+            expr = self.stack.pop()
+            self.stack.append(ArithmeticExpr('-', expr, None))
+            return
+        if ctx.spacedArithmeticOperator():
+            expr2 = self.stack.pop()
+            expr1 = self.stack.pop()
+            self.stack.append(ArithmeticExpr(ctx.spacedArithmeticOperator().arithmeticOperator().getText(),
+                                             expr1, expr2))
+
+    def exitAssignmentExpression(self, ctx:normParser.AssignmentExpressionContext):
+        expr = self.stack.pop()
+        variable_name = self.stack.pop()
+        self.stack.append(AssignmentExpr(variable_name, expr))
+
+    def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
+        qexpr = self.stack.pop()
+        aexpr = self.stack.pop()
+        self.stack.append(ConditionExpr(aexpr, ctx.spacedConditionOperator().conditionOperator().getText(),
+                                        qexpr))
+
     def exitListExpression(self, ctx:normParser.ListExpressionContext):
         exprs = []
         for ch in ctx.children:
             if isinstance(ch, normParser.QueryExpressionContext):
                 exprs.append(self.stack.pop())
-        self.stack.append(ListExpr(exprs))
+        # TODO check element type to be expression
+        self.stack.append(ListExpr(list(reversed(exprs))))
+
+    def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
+        if ctx.DOT():
+            args = self.stack.pop() if ctx.argumentExpressions() else None
+            func = ctx.aggregationFunction().getText() if ctx.aggregationFunction() else None
+            variable_name = self.stack.pop() if ctx.variableName() else None
+            qexpr = self.stack.pop()
+            if variable_name:
+                self.stack.append(PropertyExpr(qexpr, variable_name))
+            elif func:
+                self.stack.append(AggregationExpr(qexpr, func, args))
+            else:
+                raise ParseError('Dot access only Property or Aggregation function. Something wrong with the expression')
+            return
+        if ctx.NT():
+            qexpr = self.stack.pop()
+            self.stack.append(CombinedExpr('!', qexpr, None))
+            return
+        if ctx.spacedLogicalOperator():
+            expr2 = self.stack.pop()
+            expr1 = self.stack.pop()
+            self.stack.append(CombinedExpr(ctx.spacedLogicalOperator().logicalOperator().getText(), expr1, expr2))
 
     def exitDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
         type_declaration = self.stack.pop()
@@ -138,8 +251,8 @@ class NormCompiler(normListener):
         self.stack.append(ctx.getText())
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
-        variable_name = self.stack.pop()
         type_name = self.stack.pop()
+        variable_name = self.stack.pop()
         self.stack.append(ArgumentDeclaration(variable_name, type_name))
 
     def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):

@@ -104,16 +104,14 @@ evaluationExpression: (typeName | variableName) LBR argumentExpressions? RBR que
 
 arithmeticExpression
     : constant
+    | listExpression
     | variableName
-    | '-' arithmeticExpression
+    | MINUS arithmeticExpression
     | arithmeticExpression spacedArithmeticOperator arithmeticExpression
     | LBR arithmeticExpression RBR
     ;
 
-assignmentExpression
-    : variableName AS queryExpression
-    | variableName AS arithmeticExpression
-    ;
+assignmentExpression: variableName AS queryExpression;
 
 conditionExpression: arithmeticExpression spacedConditionOperator queryExpression;
 
