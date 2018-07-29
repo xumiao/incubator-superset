@@ -6,18 +6,19 @@ services:
     ports:
       - 6379:6379
     volumes:
-      - redis:/data
+      - redis-data:/data
   postgres:
     image: postgres:10.4
     restart: always
+    user: root
     environment:
       POSTGRES_DB: superset
-      POSTGRES_PASSWORD: superset
       POSTGRES_USER: superset
+      POSTGRES_PASSWORD: superset
     ports:
       - 5432:5432
     volumes:
-      - postgres:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
   npm-build:
     image: supernorm
     volumes:
@@ -41,18 +42,18 @@ services:
     ports:
       - 8088:8088
     command: ["/bin/bash", "supernorm-ui-serve.sh"]
-    network_mode: host
     depends_on:
       - redis
+      - postgres
       - npm-build
     volumes:
       - .:/home/work/supernorm
       - superset-node-modules:/home/work/supernorm/superset/assets/node_modules
       - superset-dist:/home/work/supernorm/superset/assets/dist
 volumes:
-  postgres:
+  postgres-data:
     external: true
-  redis:
+  redis-data:
     external: false
   superset-node-modules:
     external: false

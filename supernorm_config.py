@@ -42,6 +42,7 @@ LOG_FORMAT = '%(asctime)s:%(levelname)s:%(name)s:%(lineno)d:%(message)s'
 
 DEBUG = True
 
+SQLLAB_TIMEOUT = 30 * 60
 
 class CeleryConfig(object):
     BROKER_URL = 'redis://%s:%s/0' % (REDIS_HOST, REDIS_PORT)
@@ -55,3 +56,9 @@ CELERY_CONFIG = CeleryConfig
 
 APP_NAME = 'SuperNorm'
 APP_ICON = '/static/assets/images/supernorm-logo@2x.png'
+
+AUTH_USER_REGISTRATION = True
+RECAPTCHA_USE_SSL = False
+RECAPTCHA_PUBLIC_KEY = 'public'
+RECAPTCHA_PRIVATE_KEY = 'private'
+RECAPTCHA_OPTIONS = {'theme': 'white'}
