@@ -260,7 +260,7 @@ class ExpressionTestCase(unittest.TestCase):
         self.assertEqual(cmd.type_name, engine.TypeName('Company', None))
         self.assertEqual(cmd.args, engine.ListExpr([engine.ArgumentExpr(condition, None)]))
 
-    def test_combined_expression(self):
+    def test_combined_evaluation_expression(self):
         script = dedent("""
         Company(name ~ 'google')?comp & Develop(comp, 'AI');
         """)
