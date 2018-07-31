@@ -19,30 +19,71 @@ class NormErrorListener(ErrorListener):
         raise ValueError(err_msg)
 
 
-TypeName = namedtuple('TypeName', ['name', 'version'])
-ListType = namedtuple('ListType', ['intern'])
-UnionType = namedtuple('UnionType', ['types'])
-TypeDefinition = namedtuple('TypeDefinition', ['type_name', 'argument_declarations', 'output_type_name'])
-TypeImpl = namedtuple('TypeImpl', ['mode', 'code'])
-ArgumentDeclaration = namedtuple('ArgumentDeclaration', ['variable_name', 'variable_type'])
-ArgumentDeclarations = namedtuple('ArgumentDeclarations', ['arguments'])
-FullTypeDeclaration = namedtuple('FullTypeDeclaration', ['namespace', 'type_definition', 'type_implementation'])
-IncrementalTypeDeclaration = namedtuple('IncrementalTypeDeclaration', ['type_name', 'type_implementation'])
-Projection = namedtuple('Projection', ['limit', 'variable_name'])
-Constant = namedtuple('Constant', ['type_name', 'value'])
-BaseExpr = namedtuple('BaseExpr', ['type_name', 'value'])
-ListExpr = namedtuple('ListExpr', ['elements'])
-ArgumentExpr = namedtuple('ArgumentExpr', ['expr', 'projection'])
-EvaluationExpr = namedtuple('EvaluationExpr', ['type_name', 'variable_name', 'args', 'projection'])
-ArithmeticExpr = namedtuple('ArithmeticExpr', ['op', 'expr1', 'expr2'])
-AssignmentExpr = namedtuple('AssignmentExpr', ['variable_name', 'expr'])
-ConditionExpr = namedtuple('ConditionExpr', ['aexpr', 'op', 'qexpr'])
-CombinedExpr = namedtuple('CombinedExpr', ['op', 'expr1', 'expr2'])
-PropertyExpr = namedtuple('PropertyExpr', ['expr', 'property'])
-AggregationExpr = namedtuple('AggregationExpr', ['expr', 'func', 'args'])
+TypeName \
+    = namedtuple('TypeName', ['name', 'version'])
+ListType \
+    = namedtuple('ListType', ['intern'])
+UnionType \
+    = namedtuple('UnionType', ['types'])
+TypeDefinition \
+    = namedtuple('TypeDefinition', ['type_name', 'argument_declarations', 'output_type_name'])
+TypeImpl \
+    = namedtuple('TypeImpl', ['mode', 'code'])
+ArgumentDeclaration \
+    = namedtuple('ArgumentDeclaration', ['variable_name', 'variable_type'])
+ArgumentDeclarations \
+    = namedtuple('ArgumentDeclarations', ['arguments'])
+FullTypeDeclaration \
+    = namedtuple('FullTypeDeclaration', ['namespace', 'type_definition', 'type_implementation'])
+IncrementalTypeDeclaration \
+    = namedtuple('IncrementalTypeDeclaration', ['type_name', 'type_implementation'])
+Projection \
+    = namedtuple('Projection', ['limit', 'variable_name'])
+Constant \
+    = namedtuple('Constant', ['type_name', 'value'])
+BaseExpr \
+    = namedtuple('BaseExpr', ['type_name', 'value'])
+ListExpr \
+    = namedtuple('ListExpr', ['elements'])
+ArgumentExpr \
+    = namedtuple('ArgumentExpr', ['expr', 'projection'])
+EvaluationExpr \
+    = namedtuple('EvaluationExpr', ['type_name', 'variable_name', 'args', 'projection'])
+ArithmeticExpr \
+    = namedtuple('ArithmeticExpr', ['op', 'expr1', 'expr2'])
+AssignmentExpr \
+    = namedtuple('AssignmentExpr', ['variable_name', 'expr'])
+ConditionExpr \
+    = namedtuple('ConditionExpr', ['aexpr', 'op', 'qexpr'])
+CombinedExpr \
+    = namedtuple('CombinedExpr', ['op', 'expr1', 'expr2'])
+ConditionCombinedExpr \
+    = namedtuple('ConditionCombinedExpr', ['op', 'expr1', 'expr2'])
+PropertyExpr \
+    = namedtuple('PropertyExpr', ['expr', 'property'])
+AggregationExpr \
+    = namedtuple('AggregationExpr', ['expr', 'func', 'args'])
 
 
 class ParseError(ValueError):
+    pass
+
+
+class NormSyntaxError(ValueError):
+    pass
+
+
+class NormExecutable(object):
+    """
+    Execute Norm Script
+    """
+    pass
+
+
+class NormPlanner(object):
+    """
+    Optimize the execution plan for a given set of executables
+    """
     pass
 
 
@@ -51,6 +92,7 @@ class NormCompiler(normListener):
         self.comments = ''
         self.imports = []
         self.namespace = ''
+        self.variables = {}
         self.stack = []
 
     def exitNone(self, ctx:normParser.NoneContext):
@@ -196,12 +238,20 @@ class NormCompiler(normListener):
             return
         if ctx.NT():
             qexpr = self.stack.pop()
-            self.stack.append(CombinedExpr('!', qexpr, None))
+            if isinstance(qexpr, ConditionExpr) or isinstance(qexpr, ConditionCombinedExpr):
+                self.stack.append(ConditionCombinedExpr('!', qexpr, None))
+            else:
+                self.stack.append(CombinedExpr('!', qexpr, None))
             return
         if ctx.spacedLogicalOperator():
             expr2 = self.stack.pop()
             expr1 = self.stack.pop()
-            self.stack.append(CombinedExpr(ctx.spacedLogicalOperator().logicalOperator().getText(), expr1, expr2))
+            if (isinstance(expr1, ConditionExpr) or isinstance(expr1, ConditionCombinedExpr)) and\
+                    (isinstance(expr2, ConditionExpr) or isinstance(expr2, ConditionCombinedExpr)):
+                self.stack.append(ConditionCombinedExpr(ctx.spacedLogicalOperator().logicalOperator().getText(),
+                                                        expr1, expr2))
+            else:
+                self.stack.append(CombinedExpr(ctx.spacedLogicalOperator().logicalOperator().getText(), expr1, expr2))
 
     def exitDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
         type_declaration = self.stack.pop()

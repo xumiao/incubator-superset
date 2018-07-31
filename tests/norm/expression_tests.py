@@ -256,7 +256,7 @@ class ExpressionTestCase(unittest.TestCase):
         microsoft = engine.BaseExpr('constant', engine.Constant('string', 'microsoft'))
         condition1 = engine.ConditionExpr('name', '~', google)
         condition2 = engine.ConditionExpr('name', '~', microsoft)
-        condition = engine.CombinedExpr('&', condition1, engine.CombinedExpr('!', condition2, None))
+        condition = engine.ConditionCombinedExpr('&', condition1, engine.ConditionCombinedExpr('!', condition2, None))
         self.assertEqual(cmd.type_name, engine.TypeName('Company', None))
         self.assertEqual(cmd.args, engine.ListExpr([engine.ArgumentExpr(condition, None)]))
 
