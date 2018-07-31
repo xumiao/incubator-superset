@@ -54,11 +54,12 @@ class CeleryConfig(object):
 
 CELERY_CONFIG = CeleryConfig
 
+AUTH_USER_REGISTRATION = True
+RECAPTCHA_USE_SSL = True
+RECAPTCHA_PUBLIC_KEY = '6LfqG2cUAAAAAGvRGZnMC5-wNsITHuq1HjVLSlB7'
+RECAPTCHA_PRIVATE_KEY = '6LfqG2cUAAAAAOPMCcOeXBVllXbsS0-cTGjzIdiH'
+RECAPTCHA_OPTIONS = {'theme': 'white'}
+
 APP_NAME = 'SuperNorm'
 APP_ICON = '/static/assets/images/supernorm-logo@2x.png'
 
-AUTH_USER_REGISTRATION = True
-RECAPTCHA_USE_SSL = False
-RECAPTCHA_PUBLIC_KEY = 'public'
-RECAPTCHA_PRIVATE_KEY = 'private'
-RECAPTCHA_OPTIONS = {'theme': 'white'}

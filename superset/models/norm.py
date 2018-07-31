@@ -10,21 +10,20 @@ from future.standard_library import install_aliases
 
 from flask_appbuilder import Model
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, Enum, DateTime
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean
 from sqlalchemy import Table
 from sqlalchemy.ext.declarative import declared_attr
 
 from sqlalchemy.orm import relationship
 
-from superset import app, db, utils
+from superset import app, utils
 from superset import security_manager as sm
 
 from superset.models.helpers import AuditMixinNullable
-from norm.helpers import VersionedMixin, lazy_property, ParametrizedMixin, register_parameter
+from superset.models.mixins import VersionedMixin, lazy_property, ParametrizedMixin
 from superset.models.core import metadata
 
 from pandas import DataFrame
-import enum
 import traceback
 import logging
 logger = logging.getLogger(__name__)
