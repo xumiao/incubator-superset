@@ -125,10 +125,6 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
         'polymorphic_on': category
     }
 
-    @declared_attr
-    def __table_args__(cls):
-        return (*VersionedMixin.__table_args__, Model.__table_args__)
-
     def __init__(self, namespace='', name='', version=None, description='', params='', code='',
                  variables=None, user=None):
         super(Lambda, self).__init__(namespace=namespace, name=name, version=version)

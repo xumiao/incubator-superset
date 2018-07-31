@@ -20,7 +20,6 @@ class VersionedMixin(object):
     namespace = Column(String(1000), default='')
     name = Column(String(250), nullable=False)
     version = Column(Integer, default=1, nullable=False)
-    __table_args__ = (UniqueConstraint('namespace', 'name', 'version', name='unique_uri'),)
 
     def __init__(self, name='', version=None, namespace=''):
         self.name = name
