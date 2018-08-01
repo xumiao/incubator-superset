@@ -12,7 +12,7 @@ from flask_appbuilder import Model
 
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean
 from sqlalchemy import Table
-from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.ext.hybrid import hybrid_property
 
 from sqlalchemy.orm import relationship
 
@@ -69,6 +69,12 @@ class Variable(Model):
         self.type_ = type_
         self.as_input = as_input
         self.as_output = as_output
+
+    @property
+    def type_signature(self):
+        signature = '-' if not self.as_input and self.as_output else ''
+        signature += str(self.type_id) or self.type_.signature
+        return signature
 
     def get(self, mem):
         """
@@ -138,6 +144,18 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
             self.variables = []
         else:
             self.variables = variables
+
+    @hybrid_property
+    def nargs(self):
+        return len(self.variables)
+
+    @hybrid_property
+    def signature(self):
+        return '{}({})[{}]'.format(self.fully_qualified_name, self.creator.username, self.type_signature)
+
+    @property
+    def type_signature(self):
+        return ','.join((var.type_signature for var in self.variables))
 
     def clone(self, user=None):
         """
@@ -228,29 +246,4 @@ class PythonLambda(Lambda):
         """
         pass
 
-
-class NativeLambda(Lambda):
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'lambda_native'
-    }
-
-    def __init__(self, name, version, description):
-        super(Lambda, self).__init__(namespace='norm.native',
-                                     name=name,
-                                     version=version,
-                                     description=description,
-                                     variables=[Variable('', T)])
-
-
-T = NativeLambda(name='Type', version=1, description='A logical function')
-BO = NativeLambda(name='Boolean', version=1, description='Boolean, true/false, 1/0')
-IN = NativeLambda(name='Integer', version=1, description='Integer, -inf..+inf')
-ST = NativeLambda(name='String', version=1, description='String, "blahblah"')
-UN = NativeLambda(name='Unicode', version=1, description='Unicode, u"blahblah"')
-PA = NativeLambda(name='Pattern', version=1, description='Pattern, r"^test[0-9]+"')
-UU = NativeLambda(name='UUID', version=1, description='UUID, $"sfsfsfsf"')
-UR = NativeLambda(name='URL', version=1, description='URL, l"http://example.com"')
-DA = NativeLambda(name='Datetime', version=1, description='Datetime, t"2018-09-01"')
-Any = NativeLambda(name='Any', version=1, description='Any type')
 
