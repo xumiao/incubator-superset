@@ -33,7 +33,7 @@ install_aliases()
 config = app.config
 
 
-class Variable(Model):
+class Variable(Model, ParametrizedMixin):
     """Variable placeholder"""
 
     __tablename__ = 'variables'
@@ -70,13 +70,13 @@ class Variable(Model):
         self.as_input = as_input
         self.as_output = as_output
 
-    @property
+    @lazy_property
     def type_signature(self):
         signature = '-' if not self.as_input and self.as_output else ''
         signature += str(self.type_id) or self.type_.signature
         return signature
 
-    def get(self, mem):
+    def retrieve(self, mem):
         """
         Retrieve value from the memory for this variable, if not in memory, return the default defined by type.
         :param mem: the memory holds the values
@@ -86,7 +86,7 @@ class Variable(Model):
         """
         return self.type_.get_values(mem, self.fullname)
 
-    def set(self, mem, values):
+    def update(self, mem, values):
         """
         Set values to the memory for this variable
         :param mem: the memory holds the value
@@ -153,7 +153,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
     def signature(self):
         return '{}({})[{}]'.format(self.fully_qualified_name, self.creator.username, self.type_signature)
 
-    @property
+    @lazy_property
     def type_signature(self):
         return ','.join((var.type_signature for var in self.variables))
 

@@ -314,15 +314,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#aggregationFunction.
-    def enterAggregationFunction(self, ctx:normParser.AggregationFunctionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#aggregationFunction.
-    def exitAggregationFunction(self, ctx:normParser.AggregationFunctionContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#none.
     def enterNone(self, ctx:normParser.NoneContext):
         pass

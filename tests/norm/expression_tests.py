@@ -233,18 +233,19 @@ class ExpressionTestCase(unittest.TestCase):
 
     def test_aggregation_function_expression(self):
         script = dedent("""
-        Company(name ~ 'google')?*.group(by="founders");
+        Company(name ~ 'google')?*.Group(by="founders");
         """)
         exe = engine.compile_norm(script)
         cmd = exe.stack.pop()
         google = engine.BaseExpr('constant', engine.Constant('string', 'google'))
         condition = engine.ConditionExpr('name', '~', google)
-        self.assertEqual(cmd.expr, engine.EvaluationExpr(engine.TypeName('Company', None), None,
-                                                         engine.ListExpr([engine.ArgumentExpr(condition, None)]),
-                                                         engine.Projection(1000000, None)))
-        self.assertEqual(cmd.func, 'group')
-        self.assertEqual(cmd.args, engine.ListExpr([engine.ArgumentExpr(
-            engine.AssignmentExpr('by', engine.BaseExpr('constant', engine.Constant('string', "founders"))), None)]))
+        assignment = engine.AssignmentExpr('by', engine.BaseExpr('constant', engine.Constant('string', 'founders')))
+        self.assertEqual(cmd.qexpr, engine.EvaluationExpr(engine.TypeName('Company', None), None,
+                                                          engine.ListExpr([engine.ArgumentExpr(condition, None)]),
+                                                          engine.Projection(1000000, None)))
+        self.assertEqual(cmd.eexpr, engine.EvaluationExpr(engine.TypeName('Group', None), None,
+                                                          engine.ListExpr([engine.ArgumentExpr(assignment, None)]),
+                                                          None))
 
     def test_combined_condition_expression(self):
         script = dedent("""

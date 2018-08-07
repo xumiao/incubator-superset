@@ -86,7 +86,7 @@ deleteExpression: SPACED_DELETE queryExpression;
 queryExpression
     : baseExpression
     | LBR queryExpression RBR
-    | queryExpression WSS* DOT WSS* (variableName | aggregationFunction LBR argumentExpressions? RBR)
+    | queryExpression WSS* DOT WSS* (variableName | evaluationExpression)
     | evaluationExpression
     | listExpression
     | arithmeticExpression
@@ -116,8 +116,6 @@ assignmentExpression: variableName AS queryExpression;
 conditionExpression: arithmeticExpression spacedConditionOperator queryExpression;
 
 nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'timestamp' | 'version';
-
-aggregationFunction : 'max' | 'min' | 'ave' | 'count' | 'group' | 'unique' | 'sort' | 'sample';
 
 none: 'none' | 'null' | 'na';
 

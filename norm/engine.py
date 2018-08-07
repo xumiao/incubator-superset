@@ -61,8 +61,8 @@ ConditionCombinedExpr \
     = namedtuple('ConditionCombinedExpr', ['op', 'expr1', 'expr2'])
 PropertyExpr \
     = namedtuple('PropertyExpr', ['expr', 'property'])
-AggregationExpr \
-    = namedtuple('AggregationExpr', ['expr', 'func', 'args'])
+ChainedEvaluationExpr \
+    = namedtuple('ChainedEvaluationExpr', ['qexpr', 'eexpr'])
 
 
 class ParseError(ValueError):
@@ -225,16 +225,15 @@ class NormCompiler(normListener):
 
     def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
         if ctx.DOT():
-            args = self.stack.pop() if ctx.argumentExpressions() else None
-            func = ctx.aggregationFunction().getText() if ctx.aggregationFunction() else None
+            eexpr = self.stack.pop() if ctx.evaluationExpression() else None
             variable_name = self.stack.pop() if ctx.variableName() else None
             qexpr = self.stack.pop()
             if variable_name:
                 self.stack.append(PropertyExpr(qexpr, variable_name))
-            elif func:
-                self.stack.append(AggregationExpr(qexpr, func, args))
+            elif eexpr:
+                self.stack.append(ChainedEvaluationExpr(qexpr, eexpr))
             else:
-                raise ParseError('Dot access only Property or Aggregation function. Something wrong with the expression')
+                raise ParseError('Dot access only Property or functions. Something wrong with the expression')
             return
         if ctx.NT():
             qexpr = self.stack.pop()
