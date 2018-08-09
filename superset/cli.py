@@ -34,6 +34,13 @@ def init():
     security_manager.sync_role_definitions()
 
 
+@manager.command
+def init_norm():
+    """Inits the Norm models"""
+    from superset.models.natives import Register
+    Register.register()
+
+
 def debug_run(app, port, use_reloader):
     return app.run(
         host='0.0.0.0',

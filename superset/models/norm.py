@@ -119,6 +119,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
     """Lambda model is a function"""
 
     __tablename__ = 'lambdas'
+    signature = Column(String(1024), nullable=False)
     description = Column(Text, default='')
     perm = Column(String(1024))
     code = Column(Text, default='')
@@ -133,7 +134,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
 
     def __init__(self, namespace='', name='', version=None, description='', params='', code='',
                  variables=None, user=None):
-        super(Lambda, self).__init__(namespace=namespace, name=name, version=version)
+        super().__init__(namespace=namespace, name=name, version=version)
         self.description = description
         self.params = params
         self.code = code
@@ -144,14 +145,11 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
             self.variables = []
         else:
             self.variables = variables
+        self.signature = '{}({})[{}]'.format(self.fully_qualified_name, self.creator.username, self.type_signature)
 
     @hybrid_property
     def nargs(self):
         return len(self.variables)
-
-    @hybrid_property
-    def signature(self):
-        return '{}({})[{}]'.format(self.fully_qualified_name, self.creator.username, self.type_signature)
 
     @lazy_property
     def type_signature(self):

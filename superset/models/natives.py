@@ -5,6 +5,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 from sqlalchemy import Column, Integer, String, exists
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from superset import db
@@ -29,9 +30,10 @@ class Register(object):
     def register(cls):
         for clz, args, kwargs in cls.types:
             instance = clz(*args, **kwargs)
-            indb = db.session.query(exists().where(clz.signature == instance.signature)).scalar()
-            if not indb:
-                db.session.add(indb)
+            indb_query = db.session.query(clz).filter(clz.signature == instance.signature).exists()
+            if not db.session.query(indb_query).scalar():
+                logger.info('Registering class {}'.format(instance.signature))
+                db.session.add(instance)
         db.session.commit()
 
 
@@ -41,11 +43,11 @@ class NativeLambda(Lambda):
     }
 
     def __init__(self, name, version, description, variables):
-        super(Lambda, self).__init__(namespace='norm.natives',
-                                     name=name,
-                                     version=version,
-                                     description=description,
-                                     variables=variables)
+        super().__init__(namespace='norm.natives',
+                         name=name,
+                         version=version,
+                         description=description,
+                         variables=variables)
 
 
 @Register()
@@ -55,14 +57,11 @@ class TypeLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Type',
-                                           version=1,
-                                           description='A logical function',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Type'
+        super().__init__(name='Type',
+                         version=1,
+                         description='A logical function',
+                         variables=[])
+        self.signature = 'Type'
 
 
 @Register()
@@ -72,14 +71,11 @@ class AnyLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Any',
-                                           version=1,
-                                           description='Any type',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Any'
+        super().__init__(name='Any',
+                         version=1,
+                         description='Any type',
+                         variables=[])
+        self.signature = 'Any'
 
 
 @Register()
@@ -89,14 +85,11 @@ class BooleanLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Boolean',
-                                           version=1,
-                                           description='Boolean, true/false, 1/0',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Boolean'
+        super().__init__(name='Boolean',
+                         version=1,
+                         description='Boolean, true/false, 1/0',
+                         variables=[])
+        self.signature = 'Boolean'
 
 
 @Register()
@@ -106,14 +99,11 @@ class IntegerLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Integer',
-                                           version=1,
-                                           description='Integer, -inf..+inf',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Integer'
+        super().__init__(name='Integer',
+                         version=1,
+                         description='Integer, -inf..+inf',
+                         variables=[])
+        self.signature = 'Integer'
 
 
 @Register()
@@ -123,14 +113,11 @@ class StringLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='String',
-                                           version=1,
-                                           description='String, "blahbalh"',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'String'
+        super().__init__(name='String',
+                         version=1,
+                         description='String, "blahbalh"',
+                         variables=[])
+        self.signature = 'String'
 
 
 @Register()
@@ -140,14 +127,11 @@ class UnicodeLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Unicode',
-                                           version=1,
-                                           description='Unicode, u"blahblah"',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Unicode'
+        super().__init__(name='Unicode',
+                         version=1,
+                         description='Unicode, u"blahblah"',
+                         variables=[])
+        self.signature = 'Unicode'
 
 
 @Register()
@@ -157,14 +141,11 @@ class PatternLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Pattern',
-                                           version=1,
-                                           description='Pattern, r"^test[0-9]+"',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Pattern'
+        super().__init__(name='Pattern',
+                         version=1,
+                         description='Pattern, r"^test[0-9]+"',
+                         variables=[])
+        self.signature = 'Pattern'
 
 
 @Register()
@@ -174,14 +155,11 @@ class UUIDLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='UUID',
-                                           version=1,
-                                           description='UUID, $"sfsfsfsf"',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'UUID'
+        super().__init__(name='UUID',
+                         version=1,
+                         description='UUID, $"sfsfsfsf"',
+                         variables=[])
+        self.signature = 'UUID'
 
 
 @Register()
@@ -191,50 +169,48 @@ class URLLambda(NativeLambda):
     }
 
     def __init__(self):
-        super(NativeLambda, self).__init__(name='URL',
-                                           version=1,
-                                           description='URL, l"http://example.com"',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'URL'
+        super().__init__(name='URL',
+                         version=1,
+                         description='URL, l"http://example.com"',
+                         variables=[])
+        self.signature = 'URL'
 
 
 @Register()
 class DatetimeLambda(NativeLambda):
+    __mapper_args__ = {
+        'polymorphic_identity': 'lambda_native_datetime'
+    }
+
     def __init__(self):
-        super(NativeLambda, self).__init__(name='Datetime',
-                                           version=1,
-                                           description='Datetime, t"2018-09-01"',
-                                           variables=[])
-
-    @property
-    def signature(self):
-        return 'Datetime'
+        super().__init__(name='Datetime',
+                         version=1,
+                         description='Datetime, t"2018-09-01"',
+                         variables=[])
+        self.signature = 'Datetime'
 
 
-@Register(dtype='float32', shape='(300,)')
+@Register(dtype='float32', shape=[300])
 class TensorLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_tensor'
     }
 
     dtype = Column(String(16), default='float32')
-    shape = Column(String(128), default='(300,)')
+    shape = Column(ARRAY(Integer), default=[300])
 
     def __init__(self, dtype, shape):
-        super(NativeLambda, self).__init__(name='Tensor',
-                                           version=1,
-                                           description='Tensor, [2.2, 3.2]',
-                                           variables=[])
+        super().__init__(name='Tensor',
+                         version=1,
+                         description='Tensor, [2.2, 3.2]',
+                         variables=[])
         self.dtype = dtype
-        self.shape = str(shape)
+        assert(isinstance(shape, list) or isinstance(shape, tuple))
+        assert(all([isinstance(element, int) for element in shape]))
+        self.shape = list(shape)
+        self.signature = 'Tensor[{}]{}'.format(dtype, str(tuple(shape)))
 
     @hybrid_property
     def dim(self):
-        return len(eval(self.shape))
+        return len(self.shape)
 
-    @property
-    def signature(self):
-        return 'Tensor[{}]{}'.format(self.dtype, self.shape)
