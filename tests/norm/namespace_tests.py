@@ -51,3 +51,19 @@ class NamespaceTestCase(unittest.TestCase):
         exe = engine.compile_norm(script)
         self.assertEqual(exe.namespace, 'norm.base')
         self.assertEqual(exe.imports, ['norm.nn'])
+
+    def test_imports_type(self):
+        script = dedent("""
+        import norm.natives.Any;
+        """)
+        exe = engine.compile_norm(script)
+        self.assertEqual(exe.imports, ['norm.natives'])
+        self.assertEqual(exe.alias, {'Any': engine.TypeName('Any', None)})
+
+    def test_imports_type_alias(self):
+        script = dedent("""
+        import norm.natives.Any@3 as All;
+        """)
+        exe = engine.compile_norm(script)
+        self.assertEqual(exe.imports, ['norm.natives'])
+        self.assertEqual(exe.alias, {'All': engine.TypeName('Any', 3)})

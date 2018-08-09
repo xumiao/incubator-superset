@@ -27,7 +27,7 @@ namespace: SPACED_NAMESPACE namespace_name;
 
 SPACED_NAMESPACE: 'namespace' [ \t]*;
 
-imports: SPACED_IMPORT namespace_name;
+imports: SPACED_IMPORT namespace_name (DOT typeName)? (ALS TYPENAME)?;
 
 SPACED_IMPORT: 'import' [ \t]*;
 
@@ -115,7 +115,7 @@ assignmentExpression: variableName AS queryExpression;
 
 conditionExpression: arithmeticExpression spacedConditionOperator queryExpression;
 
-nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'timestamp' | 'version';
+nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'version';
 
 none: 'none' | 'null' | 'na';
 
@@ -172,6 +172,8 @@ CA: [ \t\u000C\r\n]* COMMA [ \t\u000C\r\n]*;
 CL: [ \t\u000C\r\n]* COLON [ \t\u000C\r\n]*;
 
 AS: [ \t\u000C\r\n]* '=' [ \t\u000C\r\n]*;
+
+ALS: [ \t\u000C\r\n]* 'as' [ \t\u000C\r\n]*;
 
 IN:        'in';
 NIN:       '!in';

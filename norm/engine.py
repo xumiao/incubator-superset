@@ -92,6 +92,7 @@ class NormCompiler(normListener):
         self.comments = ''
         self.imports = []
         self.namespace = ''
+        self.alias = {}
         self.variables = {}
         self.stack = []
 
@@ -276,7 +277,7 @@ class NormCompiler(normListener):
     def exitTypeName(self, ctx:normParser.TypeNameContext):
         typename = ctx.TYPENAME()
         if typename:
-            version = ctx.version().getText() if ctx.version() else None
+            version = int(ctx.version().getText()[1:]) if ctx.version() else None
             self.stack.append(TypeName(str(typename), version))
         elif ctx.LSBR():
             self.stack.append(ListType(self.stack.pop()))
@@ -358,6 +359,11 @@ class NormCompiler(normListener):
         ns = ctx.namespace_name().getText()
         if ns:
             self.imports.append(ns)
+        tp = self.stack.pop() if ctx.typeName() else None
+        if not tp:
+            return
+        als = ctx.TYPENAME().getText() if ctx.ALS() else tp.name
+        self.alias[als] = tp
 
     def execute(self):
         pass
