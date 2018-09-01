@@ -67,13 +67,17 @@ RUN wget --quiet https://repo.continuum.io/archive/Anaconda3-5.2.0-Linux-x86_64.
     /bin/bash ~/anaconda.sh -b -p $HOME/conda && \
     rm ~/anaconda.sh
 
+
 RUN $HOME/conda/bin/conda install libgcc
 
 ENV PATH $HOME/conda/bin:$PATH
 
 WORKDIR $HOME/supernorm
 
+RUN conda update numba
+RUN conda update llvmlite
 # Install requirements
+RUN pip install --upgrade pip
 RUN pip install -r requirements-dev.txt
 
 ENV PATH=$HOME/supernorm/superset/bin:$HOME/supernorm/:/opt/conda/bin:$PATH \
