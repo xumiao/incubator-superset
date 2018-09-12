@@ -121,6 +121,9 @@ def execute_norm(ctask, query_id, rendered_query, return_results=True, store_res
     if store_results and not results_backend:
         return handle_error("Results backend isn't configured.")
 
+    if rendered_query.lower().find('select') >= 0:
+        return execute_sql(ctask, query_id, rendered_query, return_results, store_results, user_name, session)
+
     query.executed_sql = rendered_query
     query.status = QueryStatus.RUNNING
     query.start_running_time = utils.now_as_float()

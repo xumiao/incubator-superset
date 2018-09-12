@@ -136,7 +136,7 @@ scipy==1.1.0
 seaborn==0.8.1
 simplejson==3.16.0
 six==1.11.0
-snowballst   emmer==1.2.1
+snowballstemmer==1.2.1
 sortedcollections==1.0.1
 sortedcontainers==2.0.4
 spacy==2.0.11
