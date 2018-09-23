@@ -76,6 +76,8 @@ WORKDIR $HOME/supernorm
 
 RUN conda update numba
 RUN conda update llvmlite
+RUN conda install python-snappy -c conda-forge
+
 # Install requirements
 RUN pip install --upgrade pip
 RUN pip install -r requirements-dev.txt

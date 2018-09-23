@@ -1,7 +1,11 @@
 from antlr4 import *
-from collections import namedtuple
 import re
 from dateutil import parser as dateparser
+from sqlalchemy import exists
+import pandas as pd
+from typing import List, Union
+
+from norm.literals import AOP, COP, LOP, CodeMode, ConstantType
 from norm.normLexer import normLexer
 from norm.normParser import normParser
 from norm.normListener import normListener
@@ -19,50 +23,534 @@ class NormErrorListener(ErrorListener):
         raise ValueError(err_msg)
 
 
-TypeName \
-    = namedtuple('TypeName', ['name', 'version'])
-ListType \
-    = namedtuple('ListType', ['intern'])
-UnionType \
-    = namedtuple('UnionType', ['types'])
-TypeDefinition \
-    = namedtuple('TypeDefinition', ['type_name', 'argument_declarations', 'output_type_name'])
-TypeImpl \
-    = namedtuple('TypeImpl', ['mode', 'code'])
-ArgumentDeclaration \
-    = namedtuple('ArgumentDeclaration', ['variable_name', 'variable_type'])
-ArgumentDeclarations \
-    = namedtuple('ArgumentDeclarations', ['arguments'])
-FullTypeDeclaration \
-    = namedtuple('FullTypeDeclaration', ['namespace', 'type_definition', 'type_implementation'])
-IncrementalTypeDeclaration \
-    = namedtuple('IncrementalTypeDeclaration', ['type_name', 'type_implementation'])
-Projection \
-    = namedtuple('Projection', ['limit', 'variable_name'])
-Constant \
-    = namedtuple('Constant', ['type_name', 'value'])
-BaseExpr \
-    = namedtuple('BaseExpr', ['type_name', 'value'])
-ListExpr \
-    = namedtuple('ListExpr', ['elements'])
-ArgumentExpr \
-    = namedtuple('ArgumentExpr', ['expr', 'projection'])
-EvaluationExpr \
-    = namedtuple('EvaluationExpr', ['type_name', 'variable_name', 'args', 'projection'])
-ArithmeticExpr \
-    = namedtuple('ArithmeticExpr', ['op', 'expr1', 'expr2'])
-AssignmentExpr \
-    = namedtuple('AssignmentExpr', ['variable_name', 'expr'])
-ConditionExpr \
-    = namedtuple('ConditionExpr', ['aexpr', 'op', 'qexpr'])
-CombinedExpr \
-    = namedtuple('CombinedExpr', ['op', 'expr1', 'expr2'])
-ConditionCombinedExpr \
-    = namedtuple('ConditionCombinedExpr', ['op', 'expr1', 'expr2'])
-PropertyExpr \
-    = namedtuple('PropertyExpr', ['expr', 'property'])
-ChainedEvaluationExpr \
-    = namedtuple('ChainedEvaluationExpr', ['qexpr', 'eexpr'])
+class NormExecutable(object):
+    """
+    Execute Norm Command
+    """
+    context = None  # type: NormCompiler
+
+    def __init__(self):
+        """
+        Build an executable from the expression command
+        """
+        pass
+
+    def execute(self, session, user):
+        """
+        Execute the command with given session and user context
+        :param session: The session the command is executed against
+        :type session: sqlalchemy.orm.Session
+        :param user: The user model
+        :return: pandas.DataFrame
+        :type: pandas.DataFrame
+        """
+        raise NotImplementedError()
+
+
+class VariableName(NormExecutable):
+
+    def __init__(self, name):
+        """
+        The name of the variable
+        :type name: str
+        """
+        super().__init__()
+        self.name = name
+
+    def execute(self, session, user):
+        pass
+
+
+class TypeName(NormExecutable):
+
+    def __init__(self, name, version):
+        """
+        The type qualified name
+        :param name: name of the type
+        :type name: str
+        :param version: version of the type
+        :type version: int
+        """
+        super().__init__()
+        self.name = name
+        self.version = version
+
+    def execute(self, session, user):
+        pass
+
+
+class ListType(NormExecutable):
+
+    def __init__(self, intern):
+        """
+        The type of List with intern type
+        :param intern: the type of the intern
+        :type intern: TypeName
+        """
+        super().__init__()
+        self.intern = intern
+
+    def execute(self, session, user):
+        pass
+
+
+class UnionType(NormExecutable):
+
+    def __init__(self, types):
+        """
+        The type of union of types. Either one of these types
+        :param types: the types to union
+        :type types: List[TypeName]
+        """
+        super().__init__()
+        self.types = types
+
+    def execute(self, session, user):
+        pass
+
+
+class TypeDefinition(NormExecutable):
+
+    def __init__(self, type_name, argument_declarations, output_type_name):
+        """
+        The definition of a type.
+        :param type_name: the type name
+        :type type_name: TypeName
+        :param argument_declarations: the list of argument declarations
+        :type argument_declarations: List[ArgumentDeclaration]
+        :param output_type_name: the type_name as output, default to boolean
+        :type output_type_name: TypeName
+        """
+        super().__init__()
+        self.type_name = type_name
+        self.argument_declarations = argument_declarations
+        self.output_type_name = output_type_name
+
+    def execute(self, session, user):
+        pass
+
+
+class TypeImpl(NormExecutable):
+
+    def __init__(self, mode, code):
+        """
+        The implementation of the type
+        :param mode: the mode of the implementation, query, python or keras
+        :type mode: CodeMode
+        :param code: the code of the implementation
+        :type code: str
+        """
+        super().__init__()
+        self.mode = mode
+        self.code = code
+
+    def execute(self, session, user):
+        pass
+
+
+class ArgumentDeclaration(NormExecutable):
+
+    def __init__(self, variable_name, variable_type):
+        """
+        The argument declaration
+        :param variable_name: the name of the variable
+        :type variable_name: VariableName
+        :param variable_type: the type of the variable
+        :type variable_type: TypeName
+        """
+        super().__init__()
+        self.variable_name = variable_name
+        self.variable_type = variable_type
+
+    def execute(self, session, user):
+        pass
+
+
+class TypeDeclaration(NormExecutable):
+
+    def __init__(self, type_definition, type_implementation):
+        """
+        The type declaration in full format
+        :param type_definition: the definition of the type
+        :type type_definition: Union[TypeName, TypeDefinition]
+        :param type_implementation: the implementation of the type
+        :type type_implementation: TypeImpl
+        """
+        super().__init__()
+        self.type_definition = type_definition
+        self.type_implementation = type_implementation
+
+    def execute(self, session, user):
+        pass
+
+
+class FullTypeDeclaration(TypeDeclaration):
+
+    def __init__(self, type_definition, type_implementation):
+        """
+        The type declaration in full format
+        :param type_definition: the definition of the type
+        :type type_definition: TypeDefinition
+        :param type_implementation: the implementation of the type
+        :type type_implementation: TypeImpl
+        """
+        super().__init__(type_definition, type_implementation)
+
+    def execute(self, session, user):
+        from superset.models.norm import Lambda, PythonLambda, KerasLambda, Variable, retrieve_type
+        namespace = self.context.namespace
+        type_def = self.type_definition
+        type_name = type_def.type_name.name
+        type_version = type_def.type_name.version or 0
+        type_imp = self.type_implementation
+        variables = []
+        for var_declaration in type_def.argument_declarations:
+            var_type = retrieve_type(namespace, var_declaration.variable_type.name,
+                                     var_declaration.variable_type.version, session)
+            variables.append(Variable(var_declaration.variable_name, var_type))
+
+        if type_imp.mode == CodeMode.PYTHON:
+            lam = PythonLambda(namespace=namespace, name=type_name, version=type_version, description='',
+                               params='{}', variables=variables, code=type_imp.code, user=user)
+        elif type_imp.mode == CodeMode.KERAS:
+            lam = KerasLambda(namespace=namespace, name=type_name, version=type_version, description='',
+                              params='{}', variables=variables, code=type_imp.code, user=user)
+        else:
+            lam = Lambda(namespace=namespace, name=type_name, version=type_version, description='',
+                         params='{}', variables=variables, code=type_imp.code, user=user)
+
+        if not session.query(exists().where(Lambda.signature == lam.signature)).scalar():
+            session.add(lam)
+            session.commit()
+            return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
+                                columns=['status', 'message'])
+        else:
+            return pd.DataFrame(data=[['skipped', '{} already exists'.format(lam.signature)]],
+                                columns=['status', 'message'])
+
+
+class IncrementalTypeDeclaration(TypeDeclaration):
+
+    def __init__(self, type_name, type_implementation):
+        """
+        The incremental type declaration
+        :param type_name: the type name to append on
+        :type type_name: TypeName
+        :param type_implementation: the implementation of the type
+        :type type_implementation: TypeImpl
+        """
+        super().__init__(type_name, type_implementation)
+
+    def execute(self, session, user):
+        pass
+
+
+class Projection(NormExecutable):
+
+    def __init__(self, limit, variable_name):
+        """
+        The projection definition
+        :param limit: the limit of the query
+        :type limit: int
+        :param variable_name: the name of the variable to project to
+        :type variable_name: VariableName
+        """
+        super().__init__()
+        self.limit = limit
+        self.variable_name = variable_name
+
+    def execute(self, session, user):
+        pass
+
+
+class Constant(NormExecutable):
+
+    def __init__(self, type_, value):
+        """
+        The constant
+        :param type_: the name of the constant type, e.g.,
+                      [none, bool, integer, float, string, unicode, pattern, uuid, url, datetime]
+        :type type_: ConstantType
+        :param value: the value of the constant
+        :type value: Union[str, unicode, int, float, bool, datetime.datetime, NoneType]
+        """
+        super().__init__()
+        self.type_ = type_
+        self.value = value
+
+    def execute(self, session, user):
+        pass
+
+
+QueryExpr = Union[Constant, VariableName, TypeName, "EvaluationExpr", "AssignmentExpr", "ArithmeticExpr",
+                  "CombinedExpr", "ConditionExpr", "ConditionCombinedExpr", "ChainedEvaluationExpr",
+                  List["QueryExpr"]]
+
+
+class ArgumentExpr(NormExecutable):
+
+    def __init__(self, expr, projection):
+        """
+        The argument expression, condition expressions and project to a new variable, or assignment expression
+        :param expr: the expression
+        :type expr: QueryExpr
+        :param projection: the projection
+        :type projection: Projection
+        """
+        super().__init__()
+        self.expr = expr
+        self.projection = projection
+
+    def execute(self, session, user):
+        pass
+
+
+class EvaluationExpr(NormExecutable):
+
+    def __init__(self, name, args, projection):
+        """
+        The evaluation of an expression either led by a type name or a variable name
+        :param name: the type name or the variable name
+        :type name: Union[TypeName, VariableName]
+        :param args: the arguments provided
+        :type args: List[ArgumentExpr]
+        :param projection: projected to a variable
+        :type projection: Projection
+        """
+        super().__init__()
+        self.name = name
+        self.args = args
+        self.projection = projection
+
+    def execute(self, session, user):
+        from superset.models.norm import Lambda, retrieve_type
+        #  imports = self.context.imports
+        if isinstance(self.name, TypeName):
+            # TODO: figure out how to search through all namespaces
+            lam = retrieve_type("", self.name.name, self.name.version, session)
+            projections = []
+            filters = []
+            for arg in self.args:
+                original_variable = None
+                if arg.expr and isinstance(arg.expr, VariableName):
+                    original_variable = arg.expr.name
+                elif arg.expr and isinstance(arg.expr, ConditionExpr):
+                    cexpr = arg.expr
+                    original_variable = cexpr.aexpr
+                    assert(isinstance(original_variable, VariableName))
+                    filters.append((original_variable.name, cexpr.op, cexpr.qexpr.value))
+
+                project_variable = arg.projection.variable_name
+                if original_variable is None and project_variable is not None:
+                    projections.append((project_variable.name, project_variable.name))
+                elif original_variable is not None and project_variable is None:
+                    projections.append((original_variable.name, original_variable.name))
+                elif original_variable is not None and project_variable is not None:
+                    projections.append((original_variable.name, project_variable.name))
+                else:
+                    raise Exception('No original variable nor project variable')
+
+            return lam.query(filters, projections)
+        elif isinstance(self.name, VariableName):
+            df = self.context.variables.get(self.name.name)
+            if df is not None:
+                projections = []
+                filters = []
+                for arg in self.args:
+                    original_variable = None
+                    if arg.expr and isinstance(arg.expr, VariableName):
+                        original_variable = arg.expr
+                    elif arg.expr and isinstance(arg.expr, ConditionExpr):
+                        cexpr = arg.expr
+                        original_variable = cexpr.aexpr
+                        assert (isinstance(cexpr.qexpr, Constant))
+                        filters.append((original_variable, cexpr.op, cexpr.qexpr.value))
+
+                    project_variable = arg.projection.variable_name
+                    if original_variable is None and project_variable is not None:
+                        projections.append((project_variable.name, project_variable.name))
+                    elif original_variable is not None and project_variable is None:
+                        projections.append((original_variable.name, original_variable.name))
+                    elif original_variable is not None and project_variable is not None:
+                        projections.append((original_variable.name, project_variable.name))
+                    else:
+                        raise Exception('No original variable nor project variable')
+                if filters:
+                    for col, op, value in filters:
+                        df = df[df[col].notnull()]
+                        if op == '~':
+                            df = df[df[col].str.contains(value.value)]
+                        elif op == '>':
+                            df = df[df[col] > value.value]
+                        elif op == '>=':
+                            df = df[df[col] >= value.value]
+                        elif op == '<':
+                            df = df[df[col] < value.value]
+                        elif op == '<=':
+                            df = df[df[col] <= value.value]
+                        elif op == '==':
+                            df = df[df[col] == value.value]
+                        elif op == '!=':
+                            if value.value is not None:
+                                df = df[df[col] != value.value]
+                        elif op == 'in':
+                            # TODO: Wrong
+                            df = df[df[col].isin(value.value)]
+                        elif op == '!in':
+                            # TODO: Wrong
+                            df = df[~df[col].isin(value.value)]
+                if projections:
+                    df.rename(columns=dict(projections))
+                return df[[col[1] for col in projections]]
+
+
+class ArithmeticExpr(NormExecutable):
+
+    def __init__(self, op, expr1, expr2):
+        """
+        Arithmetic operation over two expressions
+        :param op: the operation, e.g., [+, -, *, /, %]
+        :type op: AOP
+        :param expr1: left expression
+        :type expr1: QueryExpr
+        :param expr2: right expression
+        :type expr2: QueryExpr
+        """
+        super().__init__()
+        self.op = op
+        self.expr1 = expr1
+        self.expr2 = expr2
+
+    def execute(self, session, user):
+        pass
+
+
+class AssignmentExpr(NormExecutable):
+
+    def __init__(self, variable_name, expr):
+        """
+        Assignment
+        :param variable_name: the variable name
+        :type variable_name: VariableName
+        :param expr: the expression to be evaluated
+        :type expr: QueryExpr
+        """
+        super().__init__()
+        self.variable_name = variable_name
+        self.expr = expr
+
+    def execute(self, session, user):
+        v = self.variable_name.name
+        df = self.expr.execute()
+        self.context.variables[v] = df
+        return df
+
+
+class ConditionExpr(NormExecutable):
+
+    def __init__(self, op, aexpr, qexpr):
+        """
+        Condition expression
+        :param op: conditional operation, e.g., [<, <=, >, >=, ==, !=, in, !in, ~]. ~ means 'like'
+        :type op: COP
+        :param aexpr: arithmetic expression, e.g., a + b - c
+        :type aexpr: ArithmeticExpr
+        :param qexpr: query expression that evaluates to a constant
+        :type qexpr: QueryExpr
+        """
+        super().__init__()
+        self.op = op
+        self.aexpr = aexpr
+        self.qexpr = qexpr
+
+    def execute(self, session, user):
+        pass
+
+
+class CombinedExpr(NormExecutable):
+
+    def __init__(self, op, expr1, expr2):
+        """
+        Combining two expression together by logical operation
+        :param op: logical operation, e.g., [&, |, !]
+        :type op: LOP
+        :param expr1: left expression
+        :type expr1: QueryExpr
+        :param expr2: right expression
+        :type expr2: QueryExpr
+        """
+        super().__init__()
+        self.op = op
+        self.expr1 = expr1
+        self.expr2 = expr2
+
+    def execute(self, session, user):
+        if self.op == LOP.AND:
+            df = self.expr1.execute(session, user)  # type: pd.DataFrame
+            if not df.empty:
+                pass
+#            if isinstance(cmd.expr2, EvaluationExpr):
+"""
+                if cmd.expr2.type_name and cmd.expr2.type_name.name == 'Extract':
+                    col = cmd.expr2.args[0].expr.value
+                    pt = cmd.expr2.args[1].expr.value.value
+                    import re
+                    def extract(x):
+                        s = re.search(pt, x)
+                        return s.groups()[0] if s else None
+                    var_name = cmd.expr2.projection.variable_name
+                    df[var_name] = df[col].apply(extract)
+"""
+
+
+class ChainedEvaluationExpr(NormExecutable):
+
+    def __init__(self, qexpr, eexpr):
+        """
+        Chained evaluation expressions
+        :param qexpr: query expression
+        :type qexpr: QueryExpr
+        :param eexpr: chained evaluation expression
+        :type eexpr: Union[EvaluationExpr, VariableName]
+        """
+        super().__init__()
+        self.qexpr = qexpr
+        self.eexpr = eexpr
+
+    def execute(self, session, user):
+        df = self.qexpr.execute(session, user)
+#        elif isinstance(cmd.qexpr, BaseExpr):
+#            df = self.context.get(cmd.qexpr.value)
+
+        # TODO: Specialized to aggregations
+        agg_exp = self.eexpr.type_name.name
+        if agg_exp == 'Distinct':
+            df = df.drop_duplicates()
+        elif agg_exp == 'Count':
+            df = pd.DataFrame(df.count()).reset_index().rename(columns={"index": "column", 0: "count"})
+        elif agg_exp == 'Order':
+            arg = self.eexpr.args[0].expr
+            col = arg.expr.value.value
+            df = df.sort_values(by=col)
+        return df
+
+
+class PropertyExpr(ChainedEvaluationExpr):
+
+    def __init__(self, qexpr, eexpr):
+        """
+        Access a property from qexpr result
+        :param qexpr: query expression
+        :type qexpr: QueryExpr
+        :param eexpr: the property variable name
+        :type eexpr: VariableName
+        """
+        super().__init__(qexpr, eexpr)
+
+    def execute(self, session, user):
+        df = self.qexpr.execute(session, user)
+        # TODO: check whether the property is correct
+        return df[[self.eexpr.name]]
 
 
 class ParseError(ValueError):
@@ -73,21 +561,8 @@ class NormSyntaxError(ValueError):
     pass
 
 
-class NormExecutable(object):
-    """
-    Execute Norm Script
-    """
-    pass
-
-
-class NormPlanner(object):
-    """
-    Optimize the execution plan for a given set of executables
-    """
-    pass
-
-
 class NormCompiler(normListener):
+
     def __init__(self):
         self.comments = ''
         self.imports = []
@@ -95,49 +570,96 @@ class NormCompiler(normListener):
         self.alias = {}
         self.variables = {}
         self.stack = []
+        self.clear()
+        self.walker = ParseTreeWalker()
+
+    def clear(self):
+        self.comments = ''
+        self.imports = []
+        self.namespace = ''
+        self.alias = {}
+        self.variables = {}
+        self.stack = []
+
+    @staticmethod
+    def trim_script(script):
+        statements = script.split(';')
+        if len(statements) > 1:
+            to_compile = [s for s in statements if s.find("namespace") > -1 or s.find("import") > -1]
+            last_statement = statements[-2] + ";"
+            if last_statement.find("namespace") < 0 and last_statement.find("import") < 0:
+                to_compile.append(last_statement)
+            else:
+                to_compile[-1] += ';'
+            script = ';'.join(to_compile)
+        return script
+
+    def optimize(self):
+        """
+        Optimize the AST to have a more efficient execution plan
+        # TODO
+        * Filtering conditions can be combined and executed in batch instead of sequential
+        * Arithmetic equations can be combined and passed to DF in batch instead of sequential
+        """
+        pass
+
+    def set_execution_context(self):
+        NormExecutable.context = self
+
+    def compile(self, script, cont=False, last=True):
+        if not cont:
+            self.clear()
+        script = script.strip(' \r\n\t')
+        if last:
+            script = self.trim_script(script)
+        script = script.strip(' \r\n\t')
+        if script == '':
+            return None
+
+        self.set_execution_context()
+
+        lexer = normLexer(InputStream(script))
+        stream = CommonTokenStream(lexer)
+        parser = normParser(stream)
+        parser.addErrorListener(NormErrorListener())
+        tree = parser.script()
+        self.walker.walk(self, tree)
+        self.optimize()
+        return self.stack.pop()
 
     def exitNone(self, ctx:normParser.NoneContext):
-        self.stack.append(Constant('none', None))
+        self.stack.append(Constant(ConstantType.NULL, None))
 
     def exitBool_c(self, ctx:normParser.Bool_cContext):
-        self.stack.append(Constant('bool', ctx.getText().lower() == 'true'))
+        self.stack.append(Constant(ConstantType.BOOL, ctx.getText().lower() == 'true'))
 
     def exitInteger_c(self, ctx:normParser.Integer_cContext):
-        self.stack.append(Constant('int', int(ctx.getText())))
+        self.stack.append(Constant(ConstantType.INT, int(ctx.getText())))
 
     def exitFloat_c(self, ctx:normParser.Float_cContext):
-        self.stack.append(Constant('float', float(ctx.getText())))
+        self.stack.append(Constant(ConstantType.FLT, float(ctx.getText())))
 
     def exitString_c(self, ctx:normParser.String_cContext):
-        self.stack.append(Constant('string', str(ctx.getText()[1:-1])))
+        self.stack.append(Constant(ConstantType.STR, str(ctx.getText()[1:-1])))
 
     def exitUnicode_c(self, ctx:normParser.Unicode_cContext):
-        self.stack.append(Constant('unicode', str(ctx.getText()[2:-1]).encode('utf-8', 'ignore')))
+        self.stack.append(Constant(ConstantType.UNC, str(ctx.getText()[2:-1]).encode(config.UNICODE, 'ignore')))
 
     def exitPattern(self, ctx:normParser.PatternContext):
         try:
-            self.stack.append(Constant('pattern', re.compile(str(ctx.getText()[2:-1]))))
+            self.stack.append(Constant(ConstantType.PTN, re.compile(str(ctx.getText()[2:-1]))))
         except:
             raise ValueError('Pattern constant {} is in wrong format, should be Python regex pattern'
                              .format(ctx.getText()))
 
     def exitUuid(self, ctx:normParser.UuidContext):
-        self.stack.append(Constant('uuid', str(ctx.getText()[2:-1])))
+        self.stack.append(Constant(ConstantType.UID, str(ctx.getText()[2:-1])))
 
     def exitUrl(self, ctx:normParser.UrlContext):
-        self.stack.append(Constant('url', str(ctx.getText()[2:-1])))
+        self.stack.append(Constant(ConstantType.URL, str(ctx.getText()[2:-1])))
 
     def exitDatetime(self, ctx:normParser.DatetimeContext):
-        self.stack.append(Constant('datetime', dateparser.parse(ctx.getText()[2:-1], fuzzy=True)))
-
-    def exitBaseExpression(self, ctx:normParser.BaseExpressionContext):
-        obj = self.stack.pop()
-        if isinstance(obj, Constant):
-            self.stack.append(BaseExpr('constant', obj))
-        elif isinstance(obj, TypeName):
-            self.stack.append(BaseExpr('type', obj))
-        else:
-            self.stack.append(BaseExpr('variable', obj))
+        self.stack.append(Constant(ConstantType.DTM, dateparser.parse(ctx.getText()[2:-1], fuzzy=True)))
 
     def exitQueryLimit(self, ctx:normParser.QueryLimitContext):
         lmt = ctx.getText()
@@ -161,7 +683,6 @@ class NormCompiler(normListener):
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
         projection = self.stack.pop() if ctx.queryProjection() else None
         expr = self.stack.pop() if ctx.queryExpression() else None
-        # TODO check whether it is a query expression
         self.stack.append(ArgumentExpr(expr, projection))
 
     def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
@@ -171,39 +692,29 @@ class NormCompiler(normListener):
                 args.append(self.stack.pop())
         if not all([isinstance(arg, ArgumentExpr) for arg in args]):
             raise ParseError('Parsing Error, not all arguments parsed correctly')
-        self.stack.append(ListExpr(list(reversed(args))))
+        self.stack.append(list(reversed(args)))
 
     def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
         projection = self.stack.pop() if ctx.queryProjection() else None
         args = self.stack.pop() if ctx.argumentExpressions() else []
         variable_name = self.stack.pop() if ctx.variableName() else None
         type_name = self.stack.pop() if ctx.typeName() else None
-        self.stack.append(EvaluationExpr(type_name, variable_name, args, projection))
+        if variable_name is None and type_name is None:
+            raise ParseError('Evaluation expression at least starts with a type or a variable')
+        self.stack.append(EvaluationExpr(type_name or variable_name, args, projection))
 
     def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
-        if ctx.constant():
-            if not isinstance(self.stack[-1], Constant):
-                raise ParseError('It is supposed to be a constant not {}'.format(self.stack[-1]))
-            if self.stack[-1].type_name not in {'int', 'float', 'bool'}:
-                raise ValueError('Arithmetic can only work with numeric constant')
-            return
-        if ctx.variableName():
-            # TODO check the variable to be numeric type
-            return
-        if ctx.listExpression():
-            # TODO check the elements to be numeric type
-            return
-        if ctx.LBR():
+        if ctx.constant() or ctx.variableName() or ctx.listExpression() is not None or ctx.LBR():
             return
         if ctx.MINUS():
             expr = self.stack.pop()
-            self.stack.append(ArithmeticExpr('-', expr, None))
+            self.stack.append(ArithmeticExpr(AOP.SUB, expr, None))
             return
         if ctx.spacedArithmeticOperator():
             expr2 = self.stack.pop()
             expr1 = self.stack.pop()
-            self.stack.append(ArithmeticExpr(ctx.spacedArithmeticOperator().arithmeticOperator().getText(),
-                                             expr1, expr2))
+            aop = AOP(ctx.spacedArithmeticOperator().arithmeticOperator().getText())
+            self.stack.append(ArithmeticExpr(aop, expr1, expr2))
 
     def exitAssignmentExpression(self, ctx:normParser.AssignmentExpressionContext):
         expr = self.stack.pop()
@@ -213,16 +724,15 @@ class NormCompiler(normListener):
     def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
         qexpr = self.stack.pop()
         aexpr = self.stack.pop()
-        self.stack.append(ConditionExpr(aexpr, ctx.spacedConditionOperator().conditionOperator().getText(),
-                                        qexpr))
+        cop = COP(ctx.spacedConditionOperator().conditionOperator().getText())
+        self.stack.append(ConditionExpr(cop, aexpr, qexpr))
 
     def exitListExpression(self, ctx:normParser.ListExpressionContext):
         exprs = []
         for ch in ctx.children:
             if isinstance(ch, normParser.QueryExpressionContext):
                 exprs.append(self.stack.pop())
-        # TODO check element type to be expression
-        self.stack.append(ListExpr(list(reversed(exprs))))
+        self.stack.append(list(reversed(exprs)))
 
     def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
         if ctx.DOT():
@@ -238,36 +748,18 @@ class NormCompiler(normListener):
             return
         if ctx.NT():
             qexpr = self.stack.pop()
-            if isinstance(qexpr, ConditionExpr) or isinstance(qexpr, ConditionCombinedExpr):
-                self.stack.append(ConditionCombinedExpr('!', qexpr, None))
-            else:
-                self.stack.append(CombinedExpr('!', qexpr, None))
+            self.stack.append(CombinedExpr(LOP.NOT, qexpr, None))
             return
         if ctx.spacedLogicalOperator():
             expr2 = self.stack.pop()
             expr1 = self.stack.pop()
-            if (isinstance(expr1, ConditionExpr) or isinstance(expr1, ConditionCombinedExpr)) and\
-                    (isinstance(expr2, ConditionExpr) or isinstance(expr2, ConditionCombinedExpr)):
-                self.stack.append(ConditionCombinedExpr(ctx.spacedLogicalOperator().logicalOperator().getText(),
-                                                        expr1, expr2))
-            else:
-                self.stack.append(CombinedExpr(ctx.spacedLogicalOperator().logicalOperator().getText(), expr1, expr2))
-
-    def exitDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
-        type_declaration = self.stack.pop()
-        if isinstance(type_declaration, FullTypeDeclaration):
-            # TODO declare type
-            pass
-        elif isinstance(type_declaration, IncrementalTypeDeclaration):
-            # TODO add on type
-            pass
-        else:
-            raise ValueError('Wrong declaration syntax')
+            lop = LOP(ctx.spacedLogicalOperator().logicalOperator().getText())
+            self.stack.append(CombinedExpr(lop, expr1, expr2))
 
     def exitFullTypeDeclaration(self, ctx: normParser.FullTypeDeclarationContext):
         type_implementation = self.stack.pop()
         type_definition = self.stack.pop()
-        self.stack.append(FullTypeDeclaration(self.namespace, type_definition, type_implementation))
+        self.stack.append(FullTypeDeclaration(type_definition, type_implementation))
 
     def exitIncrementalTypeDeclaration(self, ctx:normParser.IncrementalTypeDeclarationContext):
         type_implementation = self.stack.pop()
@@ -285,20 +777,20 @@ class NormCompiler(normListener):
             t1 = self.stack.pop()
             t2 = self.stack.pop()
             t = UnionType([])
-            if isinstance(t1, UnionType):
-                t.types.extend((tt for tt in t1.types if tt not in t))
-            else:
-                t.types.append(t1)
             if isinstance(t2, UnionType):
                 t.types.extend((tt for tt in t2.types if tt not in t))
             else:
                 t.types.append(t2)
+            if isinstance(t1, UnionType):
+                t.types.extend((tt for tt in t1.types if tt not in t))
+            else:
+                t.types.append(t1)
             self.stack.append(t)
         else:
             raise ValueError('Not a valid type name definition')
 
     def exitVariableName(self, ctx:normParser.VariableNameContext):
-        self.stack.append(ctx.getText())
+        self.stack.append(VariableName(ctx.getText()))
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
         type_name = self.stack.pop()
@@ -310,7 +802,7 @@ class NormCompiler(normListener):
         for arg in ctx.children:
             if isinstance(arg, normParser.ArgumentDeclarationContext):
                 arguments.append(self.stack.pop())
-        self.stack.append(ArgumentDeclarations(list(reversed(arguments))))
+        self.stack.append(list(reversed(arguments)))
 
     def exitTypeDefinition(self, ctx:normParser.TypeDefinitionContext):
         output_type_name = None
@@ -324,11 +816,11 @@ class NormCompiler(normListener):
 
     def exitTypeImplementation(self, ctx:normParser.TypeImplementationContext):
         if ctx.LCBR():
-            self.stack.append(TypeImpl('query', ctx.code().getText()))
+            self.stack.append(TypeImpl(CodeMode.QUERY, ctx.code().getText()))
         elif ctx.PYTHON_BLOCK():
-            self.stack.append(TypeImpl('python', ctx.code().getText()))
+            self.stack.append(TypeImpl(CodeMode.PYTHON, ctx.code().getText()))
         elif ctx.KERAS_BLOCK():
-            self.stack.append(TypeImpl('keras', ctx.code().getText()))
+            self.stack.append(TypeImpl(CodeMode.KERAS, ctx.code().getText()))
         else:
             raise ValueError('Only query, python, or keras code blocks are supported')
 
@@ -364,46 +856,4 @@ class NormCompiler(normListener):
             return
         als = ctx.TYPENAME().getText() if ctx.ALS() else tp.name
         self.alias[als] = tp
-
-    def execute(self):
-        pass
-
-
-def trim_script(script):
-    statements = script.split(';')
-    if len(statements) > 1:
-        to_compile = [s for s in statements if s.find("namespace") > -1 or s.find("import") > -1]
-        last_statement = statements[-2] + ";"
-        if last_statement.find("namespace") < 0 and last_statement.find("import") < 0:
-            to_compile.append(last_statement)
-        else:
-            to_compile[-1] += ';'
-        script = ';'.join(to_compile)
-    return script
-
-
-def compile_norm(script, last=True):
-    """
-    Compile the script
-    :param script: the script to execute
-    :type script: str
-    :param last: compile the last statement, default to True
-    :type last: bool
-    :return: the executable
-    :rtype: NormExecutable
-    """
-    script = script.strip(' \r\n\t')
-    if last:
-        script = trim_script(script)
-    if script == '':
-        return None
-
-    lexer = normLexer(InputStream(script))
-    stream = CommonTokenStream(lexer)
-    parser = normParser(stream)
-    parser.addErrorListener(NormErrorListener())
-    tree = parser.script()
-    compiler = NormCompiler()
-    ParseTreeWalker().walk(compiler, tree)
-    return compiler
 

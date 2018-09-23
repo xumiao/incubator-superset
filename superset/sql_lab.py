@@ -100,6 +100,9 @@ def get_sql_results(
 def execute_norm(ctask, query_id, rendered_query, return_results=True, store_results=False,
                  user_name=None, session=None):
     """ Executes the norm script and returns the results"""
+    if rendered_query.lower().find('select') >= 0:
+        return execute_sql(ctask, query_id, rendered_query, return_results, store_results, user_name, session)
+
     query = get_query(query_id, session)
     payload = dict(query_id=query_id)
 
@@ -121,9 +124,6 @@ def execute_norm(ctask, query_id, rendered_query, return_results=True, store_res
     if store_results and not results_backend:
         return handle_error("Results backend isn't configured.")
 
-    if rendered_query.lower().find('select') >= 0:
-        return execute_sql(ctask, query_id, rendered_query, return_results, store_results, user_name, session)
-
     query.executed_sql = rendered_query
     query.status = QueryStatus.RUNNING
     query.start_running_time = utils.now_as_float()
@@ -131,10 +131,24 @@ def execute_norm(ctask, query_id, rendered_query, return_results=True, store_res
     session.commit()
     logging.info("Set query to 'running'")
 
-    cdf = norm.execute(query, not ctask.request.called_directly, user_name, handle_error)
+    database = query.database
+    db_engine_spec = database.db_engine_spec
+    db_engine_spec.patch()
+    try:
+        data = norm.execute(query.executed_sql, session, query.user)
+    except SoftTimeLimitExceeded as e:
+        logging.exception(e)
+        return handle_error(
+            "SQL Lab timeout. This environment's policy is to kill queries "
+            'after {} seconds.'.format(SQLLAB_TIMEOUT))
+    except Exception as e:
+        logging.exception(e)
+        return handle_error(db_engine_spec.extract_error_message(e))
 
     if query.status == utils.QueryStatus.STOPPED:
         return handle_error('The query has been stopped')
+
+    cdf = dataframe.SupersetDataFrame(data)
 
     query.rows = cdf.size
     query.progress = 100

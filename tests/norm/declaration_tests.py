@@ -16,5 +16,25 @@ class DeclarationTestCase(unittest.TestCase):
         Company(name: String, description: String, founders: List[Person|Teacher], founded_at: DateTime) = {};
         """)
         exe = engine.compile_norm(script)
-        self.assertEqual(exe.imports, ['norm.test'])
+        cmd = exe.stack.pop()
+        string_type = engine.TypeName('String', None)
+        pt_type = engine.UnionType([engine.TypeName('Person', None), engine.TypeName('Teacher', None)])
+        list_type = engine.ListType(pt_type)
+        datetime_type = engine.TypeName('DateTime', None)
+        self.assertEqual(cmd, engine.FullTypeDeclaration('', engine.TypeDefinition(engine.TypeName('Company', None),
+                                                                                   engine.ArgumentDeclarations([
+                                                                                       engine.ArgumentDeclaration(
+                                                                                           'name', string_type
+                                                                                       ),
+                                                                                       engine.ArgumentDeclaration(
+                                                                                           'description', string_type
+                                                                                       ),
+                                                                                       engine.ArgumentDeclaration(
+                                                                                           'founders', list_type
+                                                                                       ),
+                                                                                       engine.ArgumentDeclaration(
+                                                                                           'founded_at', datetime_type
+                                                                                       )
+                                                                                   ]), None),
+                                                         engine.TypeImpl('query', '')))
 

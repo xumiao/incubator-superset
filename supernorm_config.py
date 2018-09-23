@@ -42,9 +42,10 @@ FLASK_USE_RELOAD = True
 
 LOG_FORMAT = '%(asctime)s:%(levelname)s:%(name)s:%(lineno)d:%(message)s'
 
-DEBUG = True
+DEBUG = False
 
 SQLLAB_TIMEOUT = 30 * 60
+
 
 class CeleryConfig(object):
     BROKER_URL = 'redis://%s:%s/0' % (REDIS_HOST, REDIS_PORT)
@@ -86,3 +87,4 @@ RECAPTCHA_OPTIONS = {'theme': 'white'}
 APP_NAME = 'SuperNorm'
 APP_ICON = '/static/assets/images/supernorm-logo@2x.png'
 
+DATA_STORAGE_ROOT = '/home/work/supernorm/data'

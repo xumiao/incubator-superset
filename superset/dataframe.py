@@ -17,7 +17,6 @@ import logging
 
 import numpy as np
 import pandas as pd
-from pandas.core.common import _maybe_box_datetimelike
 from pandas.core.dtypes.dtypes import ExtensionDtype
 from past.builtins import basestring
 
@@ -65,17 +64,23 @@ class SupersetDataFrame(object):
         'V': None,   # raw data (void)
     }
 
-    def __init__(self, data, cursor_description, db_engine_spec):
+    def __init__(self, data, cursor_description=None, db_engine_spec=None):
         column_names = []
         if cursor_description:
             column_names = [col[0] for col in cursor_description]
 
-        self.column_names = dedup(
-            db_engine_spec.get_normalized_column_names(cursor_description))
+        if db_engine_spec:
+            self.column_names = dedup(db_engine_spec.get_normalized_column_names(cursor_description))
+        else:
+            self.column_names = column_names
 
-        data = data or []
-        self.df = (
-            pd.DataFrame(list(data), columns=column_names).infer_objects())
+        if data is None:
+            data = []
+
+        if isinstance(data, pd.DataFrame):
+            self.df = data
+        else:
+            self.df = (pd.DataFrame(list(data), columns=column_names).infer_objects())
 
         self._type_dict = {}
         try:
@@ -94,10 +99,7 @@ class SupersetDataFrame(object):
 
     @property
     def data(self):
-        # work around for https://github.com/pandas-dev/pandas/issues/18372
-        data = [dict((k, _maybe_box_datetimelike(v))
-                for k, v in zip(self.df.columns, np.atleast_1d(row)))
-                for row in self.df.values]
+        data = self.df.to_dict(orient='records')
         for d in data:
             for k, v in list(d.items()):
                 # if an int is too big for Java Script to handle

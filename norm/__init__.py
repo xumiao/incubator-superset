@@ -1,4 +1,8 @@
+from norm.engine import NormCompiler
+
+compiler = NormCompiler()
 
 
-def execute(query, nullpool, user_name, handle_error):
-    return []
+def execute(script, session, user, context=None):
+    executable = compiler.compile(script)
+    return executable.execute(context, session, user)

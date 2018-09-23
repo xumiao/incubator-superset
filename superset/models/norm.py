@@ -14,7 +14,7 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean
 from sqlalchemy import Table
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, with_polymorphic
 
 from superset import app, utils
 from superset import security_manager as sm
@@ -24,6 +24,8 @@ from superset.models.mixins import VersionedMixin, lazy_property, ParametrizedMi
 from superset.models.core import metadata
 
 from pandas import DataFrame
+import pandas as pd
+
 import traceback
 import logging
 logger = logging.getLogger(__name__)
@@ -73,7 +75,7 @@ class Variable(Model, ParametrizedMixin):
     @lazy_property
     def type_signature(self):
         signature = '-' if not self.as_input and self.as_output else ''
-        signature += str(self.type_id) or self.type_.signature
+        signature += str(self.type_id or self.type_.signature)
         return signature
 
     def retrieve(self, mem):
@@ -177,6 +179,45 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
         """
         pass
 
+    @property
+    def data_file(self):
+        root = config.get('DATA_STORAGE_ROOT')
+        return '{}/{}/{}.parquet'.format(root, self.namespace, self.name)
+
+    def query(self, filters=None, projections=None):
+        if projections is None:
+            df = pd.read_parquet(self.data_file)
+        else:
+            df = pd.read_parquet(self.data_file, columns=[col[0] for col in projections])
+            df = df.rename(columns=dict(projections))
+        if filters:
+            projections = dict(projections)
+            for col, op, value in filters:
+                pcol = projections.get(col, col)
+                df = df[df[pcol].notnull()]
+                if op == '~':
+                    df = df[df[pcol].str.contains(value.value)]
+                elif op == '>':
+                    df = df[df[pcol] > value.value]
+                elif op == '>=':
+                    df = df[df[pcol] >= value.value]
+                elif op == '<':
+                    df = df[df[pcol] < value.value]
+                elif op == '<=':
+                    df = df[df[pcol] <= value.value]
+                elif op == '==':
+                    df = df[df[pcol] == value.value]
+                elif op == '!=':
+                    if value.value is not None:
+                        df = df[df[pcol] != value.value]
+                elif op == 'in':
+                    # TODO: Wrong
+                    df = df[df[pcol].isin(value.value)]
+                elif op == '!in':
+                    # TODO: Wrong
+                    df = df[~df[pcol].isin(value.value)]
+        return df
+
     def set_values(self, mem, variable_name, values):
         """
         Set values of current type to the memory by the variable name
@@ -206,6 +247,11 @@ class KerasLambda(Lambda):
         'polymorphic_identity': 'lambda_keras'
     }
 
+    def __init__(self, namespace='', name='', version=None, description='', params='', code='',
+                 variables=None, user=None):
+        super().__init__(namespace=namespace, name=name, version=version, description=description, params=params,
+                         code=code, variables=variables, user=user)
+
     @lazy_property
     def keras_model(self):
         return None
@@ -223,6 +269,11 @@ class PythonLambda(Lambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_python'
     }
+
+    def __init__(self, namespace='', name='', version=None, description='', params='', code='',
+                 variables=None, user=None):
+        super().__init__(namespace=namespace, name=name, version=version, description=description, params=params,
+                         code=code, variables=variables, user=user)
 
     @lazy_property
     def apply_func(self):
@@ -243,3 +294,21 @@ class PythonLambda(Lambda):
         pass
 
 
+def retrieve_type(namespace, name, version, session):
+    """
+    Retrieving a Lambda
+    :type namespace: basestring
+    :type name: basestring
+    :type version: int
+    :type session: sqlalchemy.orm.Session
+    :return: the Lambda or None
+    """
+    if version:
+        lam = session.query(with_polymorphic(Lambda, '*'))\
+            .filter(Lambda.name == name, Lambda.version == version) \
+            .first()
+    else:
+        lam = session.query(with_polymorphic(Lambda, '*')) \
+            .filter(Lambda.name == name) \
+            .first()
+    return lam

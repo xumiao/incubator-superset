@@ -97,5 +97,10 @@ class SqlLab(BaseSupersetView):
         return redirect(
             '/savedqueryview/list/?_flt_0_user={}'.format(g.user.id))
 
+    #@expose('/norm/autocomplete')
+    #def complete(self):
+    #    a = 9
+    #    return []
+
 
 appbuilder.add_view_no_menu(SqlLab)
