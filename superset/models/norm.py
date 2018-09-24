@@ -147,9 +147,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
             self.variables = []
         else:
             self.variables = variables
-        username = user.username if user else ''
-        self.type_signature = ','.join((var.type_signature for var in self.variables))
-        self.signature = '{}({})[{}]'.format(self.fully_qualified_name, username, self.type_signature)
+        self.signature = self.fully_qualified_name
 
     @hybrid_property
     def nargs(self):

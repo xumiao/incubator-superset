@@ -5,12 +5,16 @@ from sqlalchemy import exists
 import pandas as pd
 from typing import List, Union
 
+from sqlalchemy.orm import with_polymorphic
+
 from norm.literals import AOP, COP, LOP, CodeMode, ConstantType
 from norm.normLexer import normLexer
 from norm.normParser import normParser
 from norm.normListener import normListener
 from norm import config
 from antlr4.error.ErrorListener import ErrorListener
+
+from superset.models.norm import Lambda
 
 
 class NormErrorListener(ErrorListener):
@@ -58,7 +62,17 @@ class VariableName(NormExecutable):
         self.name = name
 
     def execute(self, session, user):
-        pass
+        """
+        If variable already exists in the context variables or the dataframe, fetch it.
+        Otherwise, return the name itself
+        :rtype: Union[pd.DataFrame, str]
+        """
+        if self.name in self.context.variables:
+            return self.context.variables.get(self.name)
+        elif self.name in self.context.df:
+            return self.context.df[[self.name]]
+        else:
+            return self.name
 
 
 class TypeName(NormExecutable):
@@ -76,7 +90,21 @@ class TypeName(NormExecutable):
         self.version = version
 
     def execute(self, session, user):
-        pass
+        """
+        Retrieve the Lambda function
+        :rtype: Lambda
+        """
+        # TODO: figure out namespace imports
+        # TODO: handle exceptions
+        if self.version is not None:
+            lam = session.query(with_polymorphic(Lambda, '*')) \
+                .filter(Lambda.name == self.name, Lambda.version == self.version) \
+                .first()
+        else:
+            lam = session.query(with_polymorphic(Lambda, '*')) \
+                .filter(Lambda.name == self.name) \
+                .first()
+        return lam
 
 
 class ListType(NormExecutable):
@@ -91,7 +119,10 @@ class ListType(NormExecutable):
         self.intern = intern
 
     def execute(self, session, user):
-        pass
+        """
+        List type should be used as a literal for now
+        """
+        raise NotImplementedError("ListType is only a literal of the AST for now, not executable")
 
 
 class UnionType(NormExecutable):
@@ -106,7 +137,10 @@ class UnionType(NormExecutable):
         self.types = types
 
     def execute(self, session, user):
-        pass
+        """
+        Union type should be used as a literal for now
+        """
+        raise NotImplementedError("UnionType is only a literal of the AST for now, not executable")
 
 
 class TypeDefinition(NormExecutable):
@@ -127,7 +161,11 @@ class TypeDefinition(NormExecutable):
         self.output_type_name = output_type_name
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 class TypeImpl(NormExecutable):
@@ -145,7 +183,11 @@ class TypeImpl(NormExecutable):
         self.code = code
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 class ArgumentDeclaration(NormExecutable):
@@ -163,7 +205,11 @@ class ArgumentDeclaration(NormExecutable):
         self.variable_type = variable_type
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 class TypeDeclaration(NormExecutable):
@@ -181,7 +227,11 @@ class TypeDeclaration(NormExecutable):
         self.type_implementation = type_implementation
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 class FullTypeDeclaration(TypeDeclaration):
@@ -196,37 +246,41 @@ class FullTypeDeclaration(TypeDeclaration):
         """
         super().__init__(type_definition, type_implementation)
 
+    @staticmethod
+    def create_lambda(mode, namespace, name, version, description, params, variables, code, user):
+        from superset.models.norm import Lambda, PythonLambda, KerasLambda
+        L = Lambda
+        if mode == CodeMode.PYTHON:
+            L = PythonLambda
+        elif mode == CodeMode.KERAS:
+            L = KerasLambda
+        return L(namespace=namespace, name=name, version=version, description=description, params=params,
+                 variables=variables, code=code, user=user)
+
     def execute(self, session, user):
-        from superset.models.norm import Lambda, PythonLambda, KerasLambda, Variable, retrieve_type
+        from superset.models.norm import Variable
         namespace = self.context.namespace
         type_def = self.type_definition
         type_name = type_def.type_name.name
         type_version = type_def.type_name.version or 0
-        type_imp = self.type_implementation
-        variables = []
-        for var_declaration in type_def.argument_declarations:
-            var_type = retrieve_type(namespace, var_declaration.variable_type.name,
-                                     var_declaration.variable_type.version, session)
-            variables.append(Variable(var_declaration.variable_name, var_type))
-
-        if type_imp.mode == CodeMode.PYTHON:
-            lam = PythonLambda(namespace=namespace, name=type_name, version=type_version, description='',
-                               params='{}', variables=variables, code=type_imp.code, user=user)
-        elif type_imp.mode == CodeMode.KERAS:
-            lam = KerasLambda(namespace=namespace, name=type_name, version=type_version, description='',
-                              params='{}', variables=variables, code=type_imp.code, user=user)
-        else:
-            lam = Lambda(namespace=namespace, name=type_name, version=type_version, description='',
-                         params='{}', variables=variables, code=type_imp.code, user=user)
-
-        if not session.query(exists().where(Lambda.signature == lam.signature)).scalar():
+        # TODO: optimize to query db in batch for all types or utilize cache
+        variables = [Variable(var_declaration.variable_name, var_declaration.variable_type.execute(session, user))
+                     for var_declaration in type_def.argument_declarations]
+        # TODO: extract description from comments
+        lam = session.query(exists().where(Lambda.namespace == namespace, Lambda.name == type_name,
+                                           Lambda.version == type_version)).first()
+        if not lam:
+            lam = self.create_lambda(self.type_implementation.mode, namespace, type_name, type_version, '',
+                                     '{}', variables, self.type_implementation.code, user)
             session.add(lam)
-            session.commit()
-            return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
-                                columns=['status', 'message'])
         else:
-            return pd.DataFrame(data=[['skipped', '{} already exists'.format(lam.signature)]],
-                                columns=['status', 'message'])
+            # TODO: deal with versioning
+            lam.variables = variables
+            lam.code = self.type_implementation.code
+
+        session.commit()
+        return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
+                            columns=['status', 'message'])
 
 
 class IncrementalTypeDeclaration(TypeDeclaration):
@@ -242,7 +296,16 @@ class IncrementalTypeDeclaration(TypeDeclaration):
         super().__init__(type_name, type_implementation)
 
     def execute(self, session, user):
-        pass
+        lam = self.type_definition.execute()
+        if not lam:
+            return pd.DataFrame(data=[['failed', '{} has not been declared yet'.format(self.type_definition.name)]])
+        else:
+            # TODO: deal with versioning
+            lam.code += ' | ' + self.type_implementation.code
+
+        session.commit()
+        return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
+                            columns=['status', 'message'])
 
 
 class Projection(NormExecutable):
@@ -260,7 +323,11 @@ class Projection(NormExecutable):
         self.variable_name = variable_name
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 class Constant(NormExecutable):
@@ -279,7 +346,11 @@ class Constant(NormExecutable):
         self.value = value
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 QueryExpr = Union[Constant, VariableName, TypeName, "EvaluationExpr", "AssignmentExpr", "ArithmeticExpr",
@@ -302,7 +373,11 @@ class ArgumentExpr(NormExecutable):
         self.projection = projection
 
     def execute(self, session, user):
-        pass
+        """
+        Should be used as a literal for now
+        """
+        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
+        raise NotImplementedError(msg)
 
 
 class EvaluationExpr(NormExecutable):
@@ -323,11 +398,10 @@ class EvaluationExpr(NormExecutable):
         self.projection = projection
 
     def execute(self, session, user):
-        from superset.models.norm import Lambda, retrieve_type
         #  imports = self.context.imports
         if isinstance(self.name, TypeName):
             # TODO: figure out how to search through all namespaces
-            lam = retrieve_type("", self.name.name, self.name.version, session)
+            lam = self.name.execute(session, user)
             projections = []
             filters = []
             for arg in self.args:
@@ -519,8 +593,6 @@ class ChainedEvaluationExpr(NormExecutable):
 
     def execute(self, session, user):
         df = self.qexpr.execute(session, user)
-#        elif isinstance(cmd.qexpr, BaseExpr):
-#            df = self.context.get(cmd.qexpr.value)
 
         # TODO: Specialized to aggregations
         agg_exp = self.eexpr.type_name.name
@@ -532,6 +604,13 @@ class ChainedEvaluationExpr(NormExecutable):
             arg = self.eexpr.args[0].expr
             col = arg.expr.value.value
             df = df.sort_values(by=col)
+        elif agg_exp == 'Take':
+            start = self.eexpr.args[0].expr.value.value
+            end = self.eexpr.args[1].expr.value.value
+            if end is None:
+                df = df.loc[start:]
+            else:
+                df = df.loc[start:end]
         return df
 
 
@@ -570,6 +649,7 @@ class NormCompiler(normListener):
         self.alias = {}
         self.variables = {}
         self.stack = []
+        self.df = pd.DataFrame()
         self.clear()
         self.walker = ParseTreeWalker()
 
@@ -580,6 +660,7 @@ class NormCompiler(normListener):
         self.alias = {}
         self.variables = {}
         self.stack = []
+        self.df = pd.DataFrame()
 
     @staticmethod
     def trim_script(script):
