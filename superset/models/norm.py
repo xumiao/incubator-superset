@@ -190,28 +190,29 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
             df = df.rename(columns=dict(projections))
         if filters:
             projections = dict(projections)
+            from norm.literals import COP
             for col, op, value in filters:
                 pcol = projections.get(col, col)
                 df = df[df[pcol].notnull()]
-                if op == '~':
+                if op == COP.LK:
                     df = df[df[pcol].str.contains(value.value)]
-                elif op == '>':
+                elif op == COP.GT:
                     df = df[df[pcol] > value.value]
-                elif op == '>=':
+                elif op == COP.GE:
                     df = df[df[pcol] >= value.value]
-                elif op == '<':
+                elif op == COP.LT:
                     df = df[df[pcol] < value.value]
-                elif op == '<=':
+                elif op == COP.LE:
                     df = df[df[pcol] <= value.value]
-                elif op == '==':
+                elif op == COP.EQ:
                     df = df[df[pcol] == value.value]
-                elif op == '!=':
+                elif op == COP.NE:
                     if value.value is not None:
                         df = df[df[pcol] != value.value]
-                elif op == 'in':
+                elif op == COP.IN:
                     # TODO: Wrong
                     df = df[df[pcol].isin(value.value)]
-                elif op == '!in':
+                elif op == COP.NI:
                     # TODO: Wrong
                     df = df[~df[pcol].isin(value.value)]
         return df

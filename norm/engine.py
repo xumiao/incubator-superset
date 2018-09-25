@@ -264,11 +264,11 @@ class FullTypeDeclaration(TypeDeclaration):
         type_name = type_def.type_name.name
         type_version = type_def.type_name.version or 0
         # TODO: optimize to query db in batch for all types or utilize cache
-        variables = [Variable(var_declaration.variable_name, var_declaration.variable_type.execute(session, user))
+        variables = [Variable(var_declaration.variable_name.name, var_declaration.variable_type.execute(session, user))
                      for var_declaration in type_def.argument_declarations]
         # TODO: extract description from comments
-        lam = session.query(exists().where(Lambda.namespace == namespace, Lambda.name == type_name,
-                                           Lambda.version == type_version)).first()
+        lam = session.query(with_polymorphic(Lambda, '*'))\
+            .filter(Lambda.namespace == namespace, Lambda.name == type_name, Lambda.version == type_version).first()
         if not lam:
             lam = self.create_lambda(self.type_implementation.mode, namespace, type_name, type_version, '',
                                      '{}', variables, self.type_implementation.code, user)
@@ -400,6 +400,11 @@ class EvaluationExpr(NormExecutable):
     def execute(self, session, user):
         #  imports = self.context.imports
         if isinstance(self.name, TypeName):
+            if self.name.name == 'Concat':
+                df1 = self.args[0].expr.execute(session, user)
+                df2 = self.args[1].expr.execute(session, user)
+                df = pd.concat([df1, df2], axis=1)
+                return df
             # TODO: figure out how to search through all namespaces
             lam = self.name.execute(session, user)
             projections = []
@@ -407,12 +412,12 @@ class EvaluationExpr(NormExecutable):
             for arg in self.args:
                 original_variable = None
                 if arg.expr and isinstance(arg.expr, VariableName):
-                    original_variable = arg.expr.name
+                    original_variable = arg.expr
                 elif arg.expr and isinstance(arg.expr, ConditionExpr):
                     cexpr = arg.expr
                     original_variable = cexpr.aexpr
                     assert(isinstance(original_variable, VariableName))
-                    filters.append((original_variable.name, cexpr.op, cexpr.qexpr.value))
+                    filters.append((original_variable.name, cexpr.op, cexpr.qexpr))
 
                 project_variable = arg.projection.variable_name
                 if original_variable is None and project_variable is not None:
@@ -438,7 +443,7 @@ class EvaluationExpr(NormExecutable):
                         cexpr = arg.expr
                         original_variable = cexpr.aexpr
                         assert (isinstance(cexpr.qexpr, Constant))
-                        filters.append((original_variable, cexpr.op, cexpr.qexpr.value))
+                        filters.append((original_variable.name, cexpr.op, cexpr.qexpr))
 
                     project_variable = arg.projection.variable_name
                     if original_variable is None and project_variable is not None:
@@ -452,29 +457,29 @@ class EvaluationExpr(NormExecutable):
                 if filters:
                     for col, op, value in filters:
                         df = df[df[col].notnull()]
-                        if op == '~':
+                        if op == COP.LK:
                             df = df[df[col].str.contains(value.value)]
-                        elif op == '>':
+                        elif op == COP.GT:
                             df = df[df[col] > value.value]
-                        elif op == '>=':
+                        elif op == COP.GE:
                             df = df[df[col] >= value.value]
-                        elif op == '<':
+                        elif op == COP.LT:
                             df = df[df[col] < value.value]
-                        elif op == '<=':
+                        elif op == COP.LE:
                             df = df[df[col] <= value.value]
-                        elif op == '==':
+                        elif op == COP.EQ:
                             df = df[df[col] == value.value]
-                        elif op == '!=':
+                        elif op == COP.NE:
                             if value.value is not None:
                                 df = df[df[col] != value.value]
-                        elif op == 'in':
+                        elif op == COP.IN:
                             # TODO: Wrong
                             df = df[df[col].isin(value.value)]
-                        elif op == '!in':
+                        elif op == COP.NI:
                             # TODO: Wrong
                             df = df[~df[col].isin(value.value)]
                 if projections:
-                    df.rename(columns=dict(projections))
+                    df = df.rename(columns=dict(projections))
                 return df[[col[1] for col in projections]]
 
 
@@ -515,7 +520,7 @@ class AssignmentExpr(NormExecutable):
 
     def execute(self, session, user):
         v = self.variable_name.name
-        df = self.expr.execute()
+        df = self.expr.execute(session, user)
         self.context.variables[v] = df
         return df
 
@@ -563,18 +568,18 @@ class CombinedExpr(NormExecutable):
             df = self.expr1.execute(session, user)  # type: pd.DataFrame
             if not df.empty:
                 pass
-#            if isinstance(cmd.expr2, EvaluationExpr):
-"""
-                if cmd.expr2.type_name and cmd.expr2.type_name.name == 'Extract':
-                    col = cmd.expr2.args[0].expr.value
-                    pt = cmd.expr2.args[1].expr.value.value
+            if isinstance(self.expr2, EvaluationExpr):
+            # TODO: move to natives
+                if self.expr2.name and self.expr2.name.name == 'Extract':
+                    col = self.expr2.args[0].expr.name
+                    pt = self.expr2.args[1].expr.value
                     import re
                     def extract(x):
                         s = re.search(pt, x)
                         return s.groups()[0] if s else None
-                    var_name = cmd.expr2.projection.variable_name
+                    var_name = self.expr2.projection.variable_name.name
                     df[var_name] = df[col].apply(extract)
-"""
+            return df
 
 
 class ChainedEvaluationExpr(NormExecutable):
@@ -595,23 +600,32 @@ class ChainedEvaluationExpr(NormExecutable):
         df = self.qexpr.execute(session, user)
 
         # TODO: Specialized to aggregations
-        agg_exp = self.eexpr.type_name.name
+
+        agg_expr = self.eexpr  # type: EvaluationExpr
+        agg_exp = agg_expr.name.name
         if agg_exp == 'Distinct':
             df = df.drop_duplicates()
         elif agg_exp == 'Count':
             df = pd.DataFrame(df.count()).reset_index().rename(columns={"index": "column", 0: "count"})
         elif agg_exp == 'Order':
             arg = self.eexpr.args[0].expr
-            col = arg.expr.value.value
+            col = arg.expr.value
             df = df.sort_values(by=col)
         elif agg_exp == 'Take':
-            start = self.eexpr.args[0].expr.value.value
-            end = self.eexpr.args[1].expr.value.value
-            if end is None:
-                df = df.loc[start:]
+            start = self.eexpr.args[0].expr.value
+            end = None
+            if isinstance(self.eexpr.args[1].expr, ArithmeticExpr):
+                expr = self.eexpr.args[1].expr  # type: ArithmeticExpr
+                if expr.op == AOP.SUB:
+                    end = -expr.expr1.value
             else:
-                df = df.loc[start:end]
-        return df
+                end = self.eexpr.args[1].expr.value
+            if end is None:
+                df = df.iloc[start:]
+            else:
+                df = df.iloc[start:end]
+
+        return df.reset_index()
 
 
 class PropertyExpr(ChainedEvaluationExpr):
@@ -688,8 +702,8 @@ class NormCompiler(normListener):
         NormExecutable.context = self
 
     def compile(self, script, cont=False, last=True):
-        if not cont:
-            self.clear()
+        # if not cont:
+        #    self.clear()
         script = script.strip(' \r\n\t')
         if last:
             script = self.trim_script(script)
