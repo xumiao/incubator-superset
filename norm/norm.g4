@@ -44,6 +44,7 @@ fullTypeDeclaration : typeDefinition AS typeImplementation;
 incrementalTypeDeclaration: typeName ORAS typeImplementation;
 
 ORAS : [ \t\u000C]* OR '=' [ \t\u000C\r\n]*;
+SOR : [ \u000C]* OR [ \u000C]*;
 
 typeImplementation
     : LCBR code RCBR
@@ -61,7 +62,7 @@ code: ~(BLOCK_END)*?;
 
 version: '@' INTEGER (DOT uuid)?;
 
-typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName OR typeName;
+typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName SOR typeName;
 
 variableName : (VARNAME DOT)? (VARNAME | nativeProperty);
 
@@ -84,11 +85,13 @@ SPACED_DELETE: 'delete' [ \t]*;
 deleteExpression: SPACED_DELETE queryExpression;
 
 queryExpression
-    : baseExpression
+    : constant
+    | variableName
     | LBR queryExpression RBR
     | queryExpression WSS* DOT WSS* (variableName | evaluationExpression)
     | evaluationExpression
     | listExpression
+    | sliceExpression
     | arithmeticExpression
     | assignmentExpression
     | conditionExpression
@@ -96,15 +99,16 @@ queryExpression
     | queryExpression spacedLogicalOperator queryExpression
     ;
 
-baseExpression: constant | variableName | typeName;
-
 listExpression : LSBR (queryExpression (CA queryExpression)*)? RSBR;
 
 evaluationExpression: (typeName | variableName) LBR argumentExpressions? RBR queryProjection?;
 
+sliceExpression: (variableName | evaluationExpression | LBR queryExpression RBR) LSBR integer_c? CL integer_c? RSBR;
+
 arithmeticExpression
     : constant
     | listExpression
+    | sliceExpression
     | variableName
     | MINUS arithmeticExpression
     | arithmeticExpression spacedArithmeticOperator arithmeticExpression
@@ -136,11 +140,11 @@ bool_c:      BOOLEAN;
 integer_c:   INTEGER;
 float_c:     FLOAT;
 string_c:    STRING;
-unicode_c:   'u' STRING;
-pattern:   'r' STRING;
-uuid:      '$' STRING;
-url:       'l' STRING;
-datetime:  't' STRING;
+unicode_c:   UNICODE;
+pattern:     PATTERN;
+uuid:        UUID;
+url:         URL;
+datetime:    DATETIME;
 
 logicalOperator: AND | OR | XOR | IMP | EQV;
 
@@ -150,7 +154,7 @@ conditionOperator: EQ | NE | IN | NIN | LT | LE | GT | GE | LIKE;
 
 spacedConditionOperator: WSS? conditionOperator WSS?;
 
-arithmeticOperator: PLUS | MINUS | TIMES | DIVIDE | MOD;
+arithmeticOperator: PLUS | MINUS | TIMES | DIVIDE | MOD | EXP;
 
 spacedArithmeticOperator: WSS? arithmeticOperator WSS?;
 
@@ -164,6 +168,10 @@ RCBR: [ \t\u000C\r\n]* '}';
 
 LSBR: '[' [ \t\u000C\r\n]*;
 RSBR: [ \t\u000C\r\n]* ']';
+
+TYPENAME: [A-Z][a-zA-Z0-9]*;
+
+VARNAME: [a-z][a-zA-Z0-9_]*;
 
 NT: NOT [ \t]*;
 
@@ -196,25 +204,26 @@ OR:        '|';
 PLUS:      '+';
 SEMICOLON: ';';
 LIKE:      '~';
+EXP:       '**';
 TIMES:     '*';
 XOR:       '^';
 IMP:       '=>';
 EQV:       '<=>';
 
 BOOLEAN:    'true' | 'false';
-INTEGER:    DIGIT+;
+INTEGER:    [+-]? DIGIT+;
 FLOAT:      [+-]? DIGIT+ DOT DIGIT+ ('e' [+-]? DIGIT+)?;
 NEWLINE:    '\r'? '\n';
 STRING:     '"' ( ~["\r\n\t] )*? '"' | '\'' ( ~['\r\n\t] )*? '\'' ;
+
+UNICODE:   'u' STRING;
+PATTERN:   'r' STRING;
+UUID:      '$' STRING;
+URL:       'l' STRING;
+DATETIME:  't' STRING;
+
 
 fragment DIGIT:      [0] | NONZERO;
 fragment NONZERO:    [1-9];
 
 
-TYPENAME
-    : [A-Z][a-zA-Z0-9]*
-    ;
-
-VARNAME
-    : [a-z][a-zA-Z0-9_]*
-    ;

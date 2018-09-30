@@ -38,6 +38,7 @@ node_modules
 npm-debug.log*
 superset/assets/version_info.json
 
+.pytest_cache/
 # IntelliJ
 *.iml
 venv

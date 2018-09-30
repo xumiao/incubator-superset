@@ -41,65 +41,24 @@ class Variable(Model, ParametrizedMixin):
     __tablename__ = 'variables'
 
     id = Column(Integer, primary_key=True)
-    fullname = Column(String(256), nullable=False)
     name = Column(String(256), default='')
-    attribute = Column(String(256), default='')
     as_input = Column(Boolean, default=True)
     as_output = Column(Boolean, default=True)
     type_id = Column(Integer, ForeignKey('lambdas.id'))
     type_ = relationship('Lambda', foreign_keys=[type_id])
 
-    def __init__(self, fullname, type_, as_input=True, as_output=True):
+    def __init__(self, name, type_, as_input=True, as_output=True):
         """
         Construct the variable
-        :param fullname: the full name of the variable
-        :type fullname: str
+        :param name: the full name of the variable
+        :type name: str
         :param type_: the type of the variable
         :type type_: Lambda
         """
-        self.fullname = fullname
-        na = fullname.split('.')
-        self.name = na[0]
-        if len(na) == 2:
-            self.attribute = na[1]
-        if len(na) > 2:
-            msg = 'variable name can only take one level attribute, i.e., <name>.<attribute>, ' \
-                  'but got multiple levels {}'.format(fullname)
-            logger.error(msg)
-            logger.debug(traceback.print_exc())
-            raise ValueError(msg)
+        self.name = name
         self.type_ = type_
         self.as_input = as_input
         self.as_output = as_output
-
-    @lazy_property
-    def type_signature(self):
-        signature = '-' if not self.as_input and self.as_output else ''
-        signature += str(self.type_id or self.type_.signature)
-        return signature
-
-    def retrieve(self, mem):
-        """
-        Retrieve value from the memory for this variable, if not in memory, return the default defined by type.
-        :param mem: the memory holds the values
-        :type mem: DataFrame
-        :return: the value
-        :rtype: DataFrame
-        """
-        return self.type_.get_values(mem, self.fullname)
-
-    def update(self, mem, values):
-        """
-        Set values to the memory for this variable
-        :param mem: the memory holds the value
-        :type mem: DataFrame
-        :param values: the value to set
-        :type values: DataFrame
-        :return: the memory
-        :rtype: DataFrame
-        """
-        self.type_.set_values(mem, self.fullname, values)
-        return mem
 
 
 lambda_user = Table(

@@ -12,6 +12,7 @@ from superset import db
 from superset.models.norm import Lambda, Variable
 
 import logging
+import traceback
 logger = logging.getLogger(__name__)
 
 
@@ -34,7 +35,22 @@ class Register(object):
             if not db.session.query(indb_query).scalar():
                 logger.info('Registering class {}'.format(instance.signature))
                 db.session.add(instance)
-        db.session.commit()
+        try:
+            db.session.commit()
+        except:
+            logger.error('Type registration failed')
+            logger.debug(traceback.print_exc())
+
+    @classmethod
+    def retrieve(cls, clz, *args, **kwargs):
+        instance = clz(*args, **kwargs)
+        stored_inst= db.session.query(clz).filter(clz.signature == instance.signature).first()
+        if not stored_inst:
+            logger.info('Registering class {}'.format(instance.signature))
+            db.session.add(instance)
+        else:
+            instance = stored_inst
+        return instance
 
 
 class NativeLambda(Lambda):
@@ -76,6 +92,26 @@ class AnyLambda(NativeLambda):
                          description='Any type',
                          variables=[])
         self.signature = 'Any'
+
+
+@Register(type_=Register.retrieve(AnyLambda))
+class ListLambda(NativeLambda):
+    __mapper_args__ = {
+        'polymorphic_identity': 'lambda_native_list'
+    }
+    INTERN = 'intern'
+
+    def __init__(self, type_):
+        """
+        :param type_: the intern type of the list
+        :type type_: Lambda
+        """
+        variable = Variable(self.INTERN, type_)
+        super().__init__(name='List',
+                         version=1,
+                         description='A list of a certain type',
+                         variables=[variable])
+        self.signature = 'List[{}]'.format(type_.signature)
 
 
 @Register()

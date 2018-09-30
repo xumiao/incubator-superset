@@ -251,15 +251,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#baseExpression.
-    def enterBaseExpression(self, ctx:normParser.BaseExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#baseExpression.
-    def exitBaseExpression(self, ctx:normParser.BaseExpressionContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#listExpression.
     def enterListExpression(self, ctx:normParser.ListExpressionContext):
         pass
@@ -275,6 +266,15 @@ class normListener(ParseTreeListener):
 
     # Exit a parse tree produced by normParser#evaluationExpression.
     def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#sliceExpression.
+    def enterSliceExpression(self, ctx:normParser.SliceExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#sliceExpression.
+    def exitSliceExpression(self, ctx:normParser.SliceExpressionContext):
         pass
 
 

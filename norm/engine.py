@@ -15,6 +15,7 @@ from norm import config
 from antlr4.error.ErrorListener import ErrorListener
 
 from superset.models.norm import Lambda
+from superset.models.natives import ListLambda
 
 
 class NormErrorListener(ErrorListener):
@@ -53,13 +54,21 @@ class NormExecutable(object):
 
 class VariableName(NormExecutable):
 
-    def __init__(self, name):
+    def __init__(self, name, attribute):
         """
         The name of the variable
         :type name: str
         """
         super().__init__()
         self.name = name
+        self.attribute = attribute
+
+    @property
+    def variable(self):
+        if self.attribute:
+            return self.name + '.' + self.attribute
+        else:
+            return self.name
 
     def execute(self, session, user):
         """
@@ -68,11 +77,17 @@ class VariableName(NormExecutable):
         :rtype: Union[pd.DataFrame, str]
         """
         if self.name in self.context.variables:
-            return self.context.variables.get(self.name)
-        elif self.name in self.context.df:
-            return self.context.df[[self.name]]
+            df = self.context.variables.get(self.name)
+            if self.attribute is not None:
+                return df[[self.attribute]]
+            else:
+                return df
+
+        variable = self.variable
+        if variable in self.context.df:
+            return self.context.df[[variable]]
         else:
-            return self.name
+            return self.variable
 
 
 class TypeName(NormExecutable):
@@ -87,23 +102,23 @@ class TypeName(NormExecutable):
         """
         super().__init__()
         self.name = name
-        self.version = version
+        if version is None:
+            self.version = 1
+
+    def __str__(self):
+        return self.name + '@' + str(self.version)
 
     def execute(self, session, user):
         """
-        Retrieve the Lambda function
+        Retrieve the Lambda function by namespace, name, version.
+        Note that user is encoded by the version.
         :rtype: Lambda
         """
         # TODO: figure out namespace imports
         # TODO: handle exceptions
-        if self.version is not None:
-            lam = session.query(with_polymorphic(Lambda, '*')) \
-                .filter(Lambda.name == self.name, Lambda.version == self.version) \
-                .first()
-        else:
-            lam = session.query(with_polymorphic(Lambda, '*')) \
-                .filter(Lambda.name == self.name) \
-                .first()
+        lam = session.query(with_polymorphic(Lambda, '*')) \
+            .filter(Lambda.name == self.name, Lambda.version == self.version) \
+            .first()
         return lam
 
 
@@ -120,9 +135,14 @@ class ListType(NormExecutable):
 
     def execute(self, session, user):
         """
-        List type should be used as a literal for now
+        Return a list type
+        :rtype: ListLambda
         """
-        raise NotImplementedError("ListType is only a literal of the AST for now, not executable")
+        lam = self.intern.execute(session, user)
+        if lam is None:
+            raise ParseError("{} does not seem to be declared yet".format(self.intern))
+
+        return ListLambda(lam)
 
 
 class UnionType(NormExecutable):
@@ -206,10 +226,13 @@ class ArgumentDeclaration(NormExecutable):
 
     def execute(self, session, user):
         """
-        Should be used as a literal for now
+        Create variables or retrieve variables
+        :rtype: superset.models.norm.Variable
         """
-        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
-        raise NotImplementedError(msg)
+        from superset.models.norm import Variable
+
+        return Variable(self.variable_name.name,
+                        self.variable_type.execute(session, user))
 
 
 class TypeDeclaration(NormExecutable):
@@ -258,17 +281,14 @@ class FullTypeDeclaration(TypeDeclaration):
                  variables=variables, code=code, user=user)
 
     def execute(self, session, user):
-        from superset.models.norm import Variable
         namespace = self.context.namespace
         type_def = self.type_definition
         type_name = type_def.type_name.name
-        type_version = type_def.type_name.version or 0
+        type_version = type_def.type_name.version
         # TODO: optimize to query db in batch for all types or utilize cache
-        variables = [Variable(var_declaration.variable_name.name, var_declaration.variable_type.execute(session, user))
-                     for var_declaration in type_def.argument_declarations]
+        variables = [var_declaration.execute(session, user) for var_declaration in type_def.argument_declarations]
         # TODO: extract description from comments
-        lam = session.query(with_polymorphic(Lambda, '*'))\
-            .filter(Lambda.namespace == namespace, Lambda.name == type_name, Lambda.version == type_version).first()
+        lam = type_def.type_name.execute(session, user)
         if not lam:
             lam = self.create_lambda(self.type_implementation.mode, namespace, type_name, type_version, '',
                                      '{}', variables, self.type_implementation.code, user)
@@ -296,7 +316,7 @@ class IncrementalTypeDeclaration(TypeDeclaration):
         super().__init__(type_name, type_implementation)
 
     def execute(self, session, user):
-        lam = self.type_definition.execute()
+        lam = self.type_definition.execute(session, user)
         if not lam:
             return pd.DataFrame(data=[['failed', '{} has not been declared yet'.format(self.type_definition.name)]])
         else:
