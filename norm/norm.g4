@@ -1,21 +1,19 @@
 grammar norm;
 
 script
-    : statement (WSS* statement)* WSS*
+    : statement (WSS? statement)* WSS?
     ;
 
 statement
-    : comments
-    | namespaceExpression WSS* SEMICOLON
-    | declarationExpression WSS* SEMICOLON
-    | updateExpression WSS* SEMICOLON
-    | deleteExpression WSS* SEMICOLON
-    | queryExpression WSS* SEMICOLON
+    : (comments)? namespaceExpression WSS? SEMICOLON
+    | (comments)? namespace? WSS? typeDeclaration WSS? SEMICOLON
+    | (comments)? queryExpression WSS? SEMICOLON
+    | (comments)? typeName (ASS | ORAS | ANDAS) queryExpression WSS? SEMICOLON
     ;
 
-COMMENT: '//' ~[\r\n]*;
+COMMENT: '#' ~[\r\n]* NEWLINE;
 
-comments: '/*' comment_contents '*/' | COMMENT;
+comments: '/*' comment_contents '*/' NEWLINE | COMMENT;
 
 comment_contents: ~('*/')+;
 
@@ -31,97 +29,78 @@ imports: SPACED_IMPORT namespace_name (DOT typeName)? (ALS TYPENAME)?;
 
 SPACED_IMPORT: 'import' [ \t]*;
 
-declarationExpression: fullTypeDeclaration | incrementalTypeDeclaration;
-
-typeDefinition: typeName (LBR argumentDeclarations RBR)? (CL typeName)?;
-
 argumentDeclaration: variableName CL typeName;
 
 argumentDeclarations: argumentDeclaration (CA argumentDeclaration)*;
 
-fullTypeDeclaration : typeDefinition AS typeImplementation;
+typeDeclaration : typeName (LBR argumentDeclarations RBR)? (CL typeName)?;
 
-incrementalTypeDeclaration: typeName ORAS typeImplementation;
-
-ORAS : [ \t\u000C]* OR '=' [ \t\u000C\r\n]*;
-SOR : [ \u000C]* OR [ \u000C]*;
-
-typeImplementation
-    : LCBR code RCBR
-    | KERAS_BLOCK code BLOCK_END
-    | PYTHON_BLOCK code BLOCK_END
+magic_command
+    : SHOW
+    | CREATE
+    | UPDATE
+    | DELETE
     ;
 
-KERAS_BLOCK : '{%keras';
+version: '@' INTEGER?;
 
-PYTHON_BLOCK : '{%python';
+typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName OR typeName;
 
-BLOCK_END : '%}';
-
-code: ~(BLOCK_END)*?;
-
-version: '@' INTEGER (DOT uuid)?;
-
-typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName SOR typeName;
-
-variableName : (VARNAME DOT)? (VARNAME | nativeProperty);
+variableName : VARNAME | nativeProperty;
 
 querySign: '?' queryLimit?;
 
-queryLimit : INTEGER | '*';
+queryLimit : INTEGER;
 
 queryProjection: querySign variableName?;
 
+argumentExpression
+    : '*'
+    | arithmeticExpression
+    | variableName ASS arithmeticExpression
+    | queryProjection
+    | variableName queryProjection
+    | conditionExpression queryProjection?;
+
 argumentExpressions : argumentExpression (CA argumentExpression)*;
 
-argumentExpression: queryExpression | queryExpression? queryProjection;
-
-SPACED_UPDATE: 'update' [ \t]*;
-
-updateExpression: SPACED_UPDATE queryExpression;
-
-SPACED_DELETE: 'delete' [ \t]*;
-
-deleteExpression: SPACED_DELETE queryExpression;
-
 queryExpression
-    : constant
-    | variableName
-    | LBR queryExpression RBR
-    | queryExpression WSS* DOT WSS* (variableName | evaluationExpression)
-    | evaluationExpression
-    | listExpression
-    | sliceExpression
-    | arithmeticExpression
-    | assignmentExpression
+    : constant queryProjection?
+    | codeExpression queryProjection?
+    | evaluationExpression queryProjection?
+    | sliceExpression queryProjection?
+    | chainedExpression queryProjection?
+    | arithmeticExpression queryProjection
     | conditionExpression
+    | LBR queryExpression RBR
     | NT queryExpression
     | queryExpression spacedLogicalOperator queryExpression
     ;
 
-listExpression : LSBR (queryExpression (CA queryExpression)*)? RSBR;
+code: ~(KERAS_BLOCK|PYTHON_BLOCK|SQL_BLOCK|BLOCK_END)*;
 
-evaluationExpression: (typeName | variableName) LBR argumentExpressions? RBR queryProjection?;
+codeExpression: (KERAS_BLOCK|PYTHON_BLOCK|SQL_BLOCK) code BLOCK_END;
 
-sliceExpression: (variableName | evaluationExpression | LBR queryExpression RBR) LSBR integer_c? CL integer_c? RSBR;
+evaluationExpression: typeName LBR argumentExpressions? RBR;
+
+sliceExpression: typeName LSBR integer_c? CL integer_c? RSBR;
+
+chainedExpression
+    : evaluationExpression WSS? DOT WSS? (variableName | evaluationExpression)
+    |<assoc=right> chainedExpression WSS? DOT WSS? (variableName | evaluationExpression)
+    ;
 
 arithmeticExpression
     : constant
-    | listExpression
-    | sliceExpression
     | variableName
+    | LBR arithmeticExpression RBR
     | MINUS arithmeticExpression
     | arithmeticExpression spacedArithmeticOperator arithmeticExpression
-    | LBR arithmeticExpression RBR
     ;
 
-assignmentExpression: variableName AS queryExpression;
-
-conditionExpression: arithmeticExpression spacedConditionOperator queryExpression;
+conditionExpression: arithmeticExpression spacedConditionOperator arithmeticExpression;
 
 nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'version';
-
-none: 'none' | 'null' | 'na';
 
 constant
     : none
@@ -136,6 +115,7 @@ constant
     | datetime
     ;
 
+none:        NONE;
 bool_c:      BOOLEAN;
 integer_c:   INTEGER;
 float_c:     FLOAT;
@@ -146,7 +126,7 @@ uuid:        UUID;
 url:         URL;
 datetime:    DATETIME;
 
-logicalOperator: AND | OR | XOR | IMP | EQV;
+logicalOperator: AND | OR | NOT | XOR | IMP | EQV;
 
 spacedLogicalOperator: WSS? logicalOperator WSS?;
 
@@ -160,29 +140,16 @@ spacedArithmeticOperator: WSS? arithmeticOperator WSS?;
 
 WSS: [ \t\u000C\r\n]+;
 
-LBR: '(' [ \t\u000C\r\n]*;
-RBR: [ \t\u000C\r\n]* ')';
+LBR: '(' WSS?;
+RBR: WSS? ')';
 
-LCBR: '{' [ \t\u000C\r\n]*;
-RCBR: [ \t\u000C\r\n]* '}';
+LCBR: '{' WSS?;
+RCBR: WSS? '}';
 
-LSBR: '[' [ \t\u000C\r\n]*;
-RSBR: [ \t\u000C\r\n]* ']';
+LSBR: '[' WSS?;
+RSBR: WSS? ']';
 
-TYPENAME: [A-Z][a-zA-Z0-9]*;
-
-VARNAME: [a-z][a-zA-Z0-9_]*;
-
-NT: NOT [ \t]*;
-
-CA: [ \t\u000C\r\n]* COMMA [ \t\u000C\r\n]*;
-
-CL: [ \t\u000C\r\n]* COLON [ \t\u000C\r\n]*;
-
-AS: [ \t\u000C\r\n]* '=' [ \t\u000C\r\n]*;
-
-ALS: [ \t\u000C\r\n]* 'as' [ \t\u000C\r\n]*;
-
+NONE:      'none' | 'null' | 'na';
 IN:        'in';
 NIN:       '!in';
 AND:       '&';
@@ -222,6 +189,36 @@ UUID:      '$' STRING;
 URL:       'l' STRING;
 DATETIME:  't' STRING;
 
+SHOW: '%show' WSS?;
+UPDATE: '%update' WSS?;
+CREATE: '%create' WSS?;
+DELETE: '%delete' WSS?;
+
+KERAS_BLOCK : '{%keras' WSS?;
+
+PYTHON_BLOCK : '{%python' WSS?;
+
+SQL_BLOCK : '{%sql' WSS?;
+
+BLOCK_END : '%}';
+
+ORAS : WSS? OR '=' WSS?;
+
+ANDAS : WSS? AND '=' WSS?;
+
+NT: NOT [ \t]*;
+
+CA: WSS? COMMA WSS?;
+
+CL: WSS? COLON WSS?;
+
+ASS: WSS? '=' WSS?;
+
+ALS: WSS? 'as' WSS?;
+
+TYPENAME: [A-Z][a-zA-Z0-9]*;
+
+VARNAME: [a-z][a-zA-Z0-9_]*;
 
 fragment DIGIT:      [0] | NONZERO;
 fragment NONZERO:    [1-9];

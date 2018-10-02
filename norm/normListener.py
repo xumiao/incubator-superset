@@ -80,24 +80,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#declarationExpression.
-    def enterDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#declarationExpression.
-    def exitDeclarationExpression(self, ctx:normParser.DeclarationExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#typeDefinition.
-    def enterTypeDefinition(self, ctx:normParser.TypeDefinitionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#typeDefinition.
-    def exitTypeDefinition(self, ctx:normParser.TypeDefinitionContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#argumentDeclaration.
     def enterArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
         pass
@@ -116,39 +98,21 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#fullTypeDeclaration.
-    def enterFullTypeDeclaration(self, ctx:normParser.FullTypeDeclarationContext):
+    # Enter a parse tree produced by normParser#typeDeclaration.
+    def enterTypeDeclaration(self, ctx:normParser.TypeDeclarationContext):
         pass
 
-    # Exit a parse tree produced by normParser#fullTypeDeclaration.
-    def exitFullTypeDeclaration(self, ctx:normParser.FullTypeDeclarationContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#incrementalTypeDeclaration.
-    def enterIncrementalTypeDeclaration(self, ctx:normParser.IncrementalTypeDeclarationContext):
-        pass
-
-    # Exit a parse tree produced by normParser#incrementalTypeDeclaration.
-    def exitIncrementalTypeDeclaration(self, ctx:normParser.IncrementalTypeDeclarationContext):
+    # Exit a parse tree produced by normParser#typeDeclaration.
+    def exitTypeDeclaration(self, ctx:normParser.TypeDeclarationContext):
         pass
 
 
-    # Enter a parse tree produced by normParser#typeImplementation.
-    def enterTypeImplementation(self, ctx:normParser.TypeImplementationContext):
+    # Enter a parse tree produced by normParser#magic_command.
+    def enterMagic_command(self, ctx:normParser.Magic_commandContext):
         pass
 
-    # Exit a parse tree produced by normParser#typeImplementation.
-    def exitTypeImplementation(self, ctx:normParser.TypeImplementationContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#code.
-    def enterCode(self, ctx:normParser.CodeContext):
-        pass
-
-    # Exit a parse tree produced by normParser#code.
-    def exitCode(self, ctx:normParser.CodeContext):
+    # Exit a parse tree produced by normParser#magic_command.
+    def exitMagic_command(self, ctx:normParser.Magic_commandContext):
         pass
 
 
@@ -206,15 +170,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#argumentExpressions.
-    def enterArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
-        pass
-
-    # Exit a parse tree produced by normParser#argumentExpressions.
-    def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#argumentExpression.
     def enterArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
         pass
@@ -224,21 +179,12 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#updateExpression.
-    def enterUpdateExpression(self, ctx:normParser.UpdateExpressionContext):
+    # Enter a parse tree produced by normParser#argumentExpressions.
+    def enterArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
         pass
 
-    # Exit a parse tree produced by normParser#updateExpression.
-    def exitUpdateExpression(self, ctx:normParser.UpdateExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#deleteExpression.
-    def enterDeleteExpression(self, ctx:normParser.DeleteExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#deleteExpression.
-    def exitDeleteExpression(self, ctx:normParser.DeleteExpressionContext):
+    # Exit a parse tree produced by normParser#argumentExpressions.
+    def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
         pass
 
 
@@ -251,12 +197,21 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#listExpression.
-    def enterListExpression(self, ctx:normParser.ListExpressionContext):
+    # Enter a parse tree produced by normParser#code.
+    def enterCode(self, ctx:normParser.CodeContext):
         pass
 
-    # Exit a parse tree produced by normParser#listExpression.
-    def exitListExpression(self, ctx:normParser.ListExpressionContext):
+    # Exit a parse tree produced by normParser#code.
+    def exitCode(self, ctx:normParser.CodeContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#codeExpression.
+    def enterCodeExpression(self, ctx:normParser.CodeExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#codeExpression.
+    def exitCodeExpression(self, ctx:normParser.CodeExpressionContext):
         pass
 
 
@@ -278,21 +233,21 @@ class normListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by normParser#chainedExpression.
+    def enterChainedExpression(self, ctx:normParser.ChainedExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#chainedExpression.
+    def exitChainedExpression(self, ctx:normParser.ChainedExpressionContext):
+        pass
+
+
     # Enter a parse tree produced by normParser#arithmeticExpression.
     def enterArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
         pass
 
     # Exit a parse tree produced by normParser#arithmeticExpression.
     def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#assignmentExpression.
-    def enterAssignmentExpression(self, ctx:normParser.AssignmentExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#assignmentExpression.
-    def exitAssignmentExpression(self, ctx:normParser.AssignmentExpressionContext):
         pass
 
 
@@ -314,21 +269,21 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#none.
-    def enterNone(self, ctx:normParser.NoneContext):
-        pass
-
-    # Exit a parse tree produced by normParser#none.
-    def exitNone(self, ctx:normParser.NoneContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#constant.
     def enterConstant(self, ctx:normParser.ConstantContext):
         pass
 
     # Exit a parse tree produced by normParser#constant.
     def exitConstant(self, ctx:normParser.ConstantContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#none.
+    def enterNone(self, ctx:normParser.NoneContext):
+        pass
+
+    # Exit a parse tree produced by normParser#none.
+    def exitNone(self, ctx:normParser.NoneContext):
         pass
 
 

@@ -54,21 +54,13 @@ class NormExecutable(object):
 
 class VariableName(NormExecutable):
 
-    def __init__(self, name, attribute):
+    def __init__(self, name):
         """
         The name of the variable
         :type name: str
         """
         super().__init__()
         self.name = name
-        self.attribute = attribute
-
-    @property
-    def variable(self):
-        if self.attribute:
-            return self.name + '.' + self.attribute
-        else:
-            return self.name
 
     def execute(self, session, user):
         """
@@ -77,17 +69,13 @@ class VariableName(NormExecutable):
         :rtype: Union[pd.DataFrame, str]
         """
         if self.name in self.context.variables:
-            df = self.context.variables.get(self.name)
-            if self.attribute is not None:
-                return df[[self.attribute]]
-            else:
-                return df
+            return self.context.variables.get(self.name)
 
-        variable = self.variable
+        variable = self.name
         if variable in self.context.df:
             return self.context.df[[variable]]
         else:
-            return self.variable
+            return self.name
 
 
 class TypeName(NormExecutable):
@@ -163,31 +151,6 @@ class UnionType(NormExecutable):
         raise NotImplementedError("UnionType is only a literal of the AST for now, not executable")
 
 
-class TypeDefinition(NormExecutable):
-
-    def __init__(self, type_name, argument_declarations, output_type_name):
-        """
-        The definition of a type.
-        :param type_name: the type name
-        :type type_name: TypeName
-        :param argument_declarations: the list of argument declarations
-        :type argument_declarations: List[ArgumentDeclaration]
-        :param output_type_name: the type_name as output, default to boolean
-        :type output_type_name: TypeName
-        """
-        super().__init__()
-        self.type_name = type_name
-        self.argument_declarations = argument_declarations
-        self.output_type_name = output_type_name
-
-    def execute(self, session, user):
-        """
-        Should be used as a literal for now
-        """
-        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
-        raise NotImplementedError(msg)
-
-
 class TypeImpl(NormExecutable):
 
     def __init__(self, mode, code):
@@ -235,93 +198,79 @@ class ArgumentDeclaration(NormExecutable):
                         self.variable_type.execute(session, user))
 
 
-class TypeDeclaration(NormExecutable):
+class FullTypeDeclaration(NormExecutable):
 
-    def __init__(self, type_definition, type_implementation):
+    def __init__(self, type_name, argument_declarations, output_type_name, type_implementation):
         """
         The type declaration in full format
-        :param type_definition: the definition of the type
-        :type type_definition: Union[TypeName, TypeDefinition]
+        :param type_name: the type name
+        :type type_name: TypeName
+        :param argument_declarations: the list of argument declarations
+        :type argument_declarations: List[ArgumentDeclaration]
+        :param output_type_name: the type_name as output, default to boolean
+        :type output_type_name: TypeName
         :param type_implementation: the implementation of the type
         :type type_implementation: TypeImpl
         """
         super().__init__()
-        self.type_definition = type_definition
-        self.type_implementation = type_implementation
+        self.type_name = type_name
+        self.argument_declarations = argument_declarations
+        self.output_type_name = output_type_name
+        self.mode = type_implementation.mode
+        self.code = type_implementation.code
 
-    def execute(self, session, user):
-        """
-        Should be used as a literal for now
-        """
-        msg = "{} is only a literal of the AST for now, not executable".format(self.__class__.__name__)
-        raise NotImplementedError(msg)
-
-
-class FullTypeDeclaration(TypeDeclaration):
-
-    def __init__(self, type_definition, type_implementation):
-        """
-        The type declaration in full format
-        :param type_definition: the definition of the type
-        :type type_definition: TypeDefinition
-        :param type_implementation: the implementation of the type
-        :type type_implementation: TypeImpl
-        """
-        super().__init__(type_definition, type_implementation)
-
-    @staticmethod
-    def create_lambda(mode, namespace, name, version, description, params, variables, code, user):
+    def create_lambda(self, description, params, variables, user):
         from superset.models.norm import Lambda, PythonLambda, KerasLambda
+        namespace = self.context.namespace
+        name = self.type_name.name
+        version = self.type_name.version
         L = Lambda
-        if mode == CodeMode.PYTHON:
+        if self.mode == CodeMode.PYTHON:
             L = PythonLambda
-        elif mode == CodeMode.KERAS:
+        elif self.mode == CodeMode.KERAS:
             L = KerasLambda
         return L(namespace=namespace, name=name, version=version, description=description, params=params,
-                 variables=variables, code=code, user=user)
+                 variables=variables, code=self.code, user=user)
 
     def execute(self, session, user):
-        namespace = self.context.namespace
-        type_def = self.type_definition
-        type_name = type_def.type_name.name
-        type_version = type_def.type_name.version
         # TODO: optimize to query db in batch for all types or utilize cache
-        variables = [var_declaration.execute(session, user) for var_declaration in type_def.argument_declarations]
+        variables = [var_declaration.execute(session, user) for var_declaration in reversed(self.argument_declarations)]
         # TODO: extract description from comments
-        lam = type_def.type_name.execute(session, user)
+        lam = self.type_name.execute(session, user)
         if not lam:
-            lam = self.create_lambda(self.type_implementation.mode, namespace, type_name, type_version, '',
-                                     '{}', variables, self.type_implementation.code, user)
+            lam = self.create_lambda('', '{}', variables, user)
             session.add(lam)
         else:
             # TODO: deal with versioning
             lam.variables = variables
-            lam.code = self.type_implementation.code
+            lam.code = self.code
 
         session.commit()
         return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
                             columns=['status', 'message'])
 
 
-class IncrementalTypeDeclaration(TypeDeclaration):
+class IncrementalTypeDeclaration(NormExecutable):
 
-    def __init__(self, type_name, type_implementation):
+    def __init__(self, type_name, code):
         """
         The incremental type declaration
         :param type_name: the type name to append on
         :type type_name: TypeName
-        :param type_implementation: the implementation of the type
-        :type type_implementation: TypeImpl
+        :param code: the implementation of the type
+        :type code: str
         """
-        super().__init__(type_name, type_implementation)
+        super().__init__()
+        self.type_name = type_name
+        self.code = code
 
     def execute(self, session, user):
-        lam = self.type_definition.execute(session, user)
+        lam = self.type_name.execute(session, user)
         if not lam:
-            return pd.DataFrame(data=[['failed', '{} has not been declared yet'.format(self.type_definition.name)]])
+            return pd.DataFrame(data=[['failed', '{} has not been declared yet'.format(self.type_name.name)]])
         else:
             # TODO: deal with versioning
-            lam.code += ' | ' + self.type_implementation.code
+            lam.code += ' | ' + self.code
 
         session.commit()
         return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
@@ -373,7 +322,7 @@ class Constant(NormExecutable):
         raise NotImplementedError(msg)
 
 
-QueryExpr = Union[Constant, VariableName, TypeName, "EvaluationExpr", "AssignmentExpr", "ArithmeticExpr",
+QueryExpr = Union[Constant, VariableName, "EvaluationExpr", "AssignmentExpr", "ArithmeticExpr",
                   "CombinedExpr", "ConditionExpr", "ConditionCombinedExpr", "ChainedEvaluationExpr",
                   List["QueryExpr"]]
 
@@ -384,7 +333,7 @@ class ArgumentExpr(NormExecutable):
         """
         The argument expression, condition expressions and project to a new variable, or assignment expression
         :param expr: the expression
-        :type expr: QueryExpr
+        :type expr: ConditionExpr
         :param projection: the projection
         :type projection: Projection
         """
@@ -429,7 +378,7 @@ class EvaluationExpr(NormExecutable):
             lam = self.name.execute(session, user)
             projections = []
             filters = []
-            for arg in self.args:
+            for arg in reversed(self.args):
                 original_variable = None
                 if arg.expr and isinstance(arg.expr, VariableName):
                     original_variable = arg.expr
@@ -462,8 +411,9 @@ class EvaluationExpr(NormExecutable):
                     elif arg.expr and isinstance(arg.expr, ConditionExpr):
                         cexpr = arg.expr
                         original_variable = cexpr.aexpr
-                        assert (isinstance(cexpr.qexpr, Constant))
-                        filters.append((original_variable.name, cexpr.op, cexpr.qexpr))
+                        if cexpr.qexpr:
+                            assert (isinstance(cexpr.qexpr, Constant))
+                            filters.append((original_variable.name, cexpr.op, cexpr.qexpr))
 
                     project_variable = arg.projection.variable_name
                     if original_variable is None and project_variable is not None:
@@ -500,7 +450,7 @@ class EvaluationExpr(NormExecutable):
                             df = df[~df[col].isin(value.value)]
                 if projections:
                     df = df.rename(columns=dict(projections))
-                return df[[col[1] for col in projections]]
+                return df[[col[1] for col in projections]] if projections else df
 
 
 class ArithmeticExpr(NormExecutable):
@@ -589,17 +539,42 @@ class CombinedExpr(NormExecutable):
             if not df.empty:
                 pass
             if isinstance(self.expr2, EvaluationExpr):
-            # TODO: move to natives
+                # TODO: move to natives
                 if self.expr2.name and self.expr2.name.name == 'Extract':
-                    col = self.expr2.args[0].expr.name
-                    pt = self.expr2.args[1].expr.value
+                    col = self.expr2.args[1].expr.aexpr.name
+                    pt = self.expr2.args[0].expr.aexpr.value
                     import re
                     def extract(x):
                         s = re.search(pt, x)
                         return s.groups()[0] if s else None
                     var_name = self.expr2.projection.variable_name.name
                     df[var_name] = df[col].apply(extract)
+                else:
+                    df2 = self.expr2.execute(session, user)
+                    df = pd.concat([df, df2], axis=1)
             return df
+
+
+class SliceExpr(NormExecutable):
+
+    def __init__(self, expr, start, end):
+        """
+        Slice the expression results
+        :param expr: the expression to evaluate
+        :type expr: NormExecutable
+        :param start: the start position
+        :type start: int
+        :param end: the end position
+        :type end: int
+        """
+        super().__init__()
+        self.expr = expr
+        self.start = start
+        self.end = end
+
+    def execute(self, session, user):
+        df = self.expr.execute(session, user)
+        return df.iloc[self.start:self.end]
 
 
 class ChainedEvaluationExpr(NormExecutable):
@@ -629,21 +604,8 @@ class ChainedEvaluationExpr(NormExecutable):
             df = pd.DataFrame(df.count()).reset_index().rename(columns={"index": "column", 0: "count"})
         elif agg_exp == 'Order':
             arg = self.eexpr.args[0].expr
-            col = arg.expr.value
+            col = arg.aexpr.value
             df = df.sort_values(by=col)
-        elif agg_exp == 'Take':
-            start = self.eexpr.args[0].expr.value
-            end = None
-            if isinstance(self.eexpr.args[1].expr, ArithmeticExpr):
-                expr = self.eexpr.args[1].expr  # type: ArithmeticExpr
-                if expr.op == AOP.SUB:
-                    end = -expr.expr1.value
-            else:
-                end = self.eexpr.args[1].expr.value
-            if end is None:
-                df = df.iloc[start:]
-            else:
-                df = df.iloc[start:end]
 
         return df.reset_index()
 
@@ -797,17 +759,13 @@ class NormCompiler(normListener):
 
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
         projection = self.stack.pop() if ctx.queryProjection() else None
-        expr = self.stack.pop() if ctx.queryExpression() else None
+        expr = self.stack.pop()
         self.stack.append(ArgumentExpr(expr, projection))
 
     def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
-        args = []
-        for ch in ctx.children:
-            if isinstance(ch, normParser.ArgumentExpressionContext):
-                args.append(self.stack.pop())
-        if not all([isinstance(arg, ArgumentExpr) for arg in args]):
-            raise ParseError('Parsing Error, not all arguments parsed correctly')
-        self.stack.append(list(reversed(args)))
+        args = [self.stack.pop() for ch in ctx.children
+                if isinstance(ch, normParser.ArgumentExpressionContext)]
+        self.stack.append(args)
 
     def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
         projection = self.stack.pop() if ctx.queryProjection() else None
@@ -819,7 +777,7 @@ class NormCompiler(normListener):
         self.stack.append(EvaluationExpr(type_name or variable_name, args, projection))
 
     def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
-        if ctx.constant() or ctx.variableName() or ctx.listExpression() is not None or ctx.LBR():
+        if ctx.constant() or ctx.variableName() or ctx.LBR():
             return
         if ctx.MINUS():
             expr = self.stack.pop()
@@ -837,30 +795,29 @@ class NormCompiler(normListener):
         self.stack.append(AssignmentExpr(variable_name, expr))
 
     def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
-        qexpr = self.stack.pop()
+        qexpr = self.stack.pop() if ctx.queryExpression() else None
         aexpr = self.stack.pop()
-        cop = COP(ctx.spacedConditionOperator().conditionOperator().getText())
+        cop = COP(ctx.spacedConditionOperator().conditionOperator().getText()) \
+            if ctx.spacedConditionOperator() else None
         self.stack.append(ConditionExpr(cop, aexpr, qexpr))
 
     def exitListExpression(self, ctx:normParser.ListExpressionContext):
-        exprs = []
-        for ch in ctx.children:
-            if isinstance(ch, normParser.QueryExpressionContext):
-                exprs.append(self.stack.pop())
-        self.stack.append(list(reversed(exprs)))
+        exprs = [self.stack.pop() for ch in ctx.children
+                 if isinstance(ch, normParser.QueryExpressionContext)]
+        self.stack.append(exprs)
+
+    def exitSliceExpression(self, ctx:normParser.SliceExpressionContext):
+        end = self.stack.pop().value if ctx.integer_c(1) else None
+        start = self.stack.pop().value if ctx.integer_c(0) else None
+        expr = self.stack.pop()
+        self.stack.append(SliceExpr(expr, start, end))
+
+    def exitChainedExpression(self, ctx:normParser.ChainedExpressionContext):
+        eexpr = self.stack.pop()
+        qexpr = self.stack.pop()
+        self.stack.append(ChainedEvaluationExpr(qexpr, eexpr))
 
     def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
-        if ctx.DOT():
-            eexpr = self.stack.pop() if ctx.evaluationExpression() else None
-            variable_name = self.stack.pop() if ctx.variableName() else None
-            qexpr = self.stack.pop()
-            if variable_name:
-                self.stack.append(PropertyExpr(qexpr, variable_name))
-            elif eexpr:
-                self.stack.append(ChainedEvaluationExpr(qexpr, eexpr))
-            else:
-                raise ParseError('Dot access only Property or functions. Something wrong with the expression')
-            return
         if ctx.NT():
             qexpr = self.stack.pop()
             self.stack.append(CombinedExpr(LOP.NOT, qexpr, None))
@@ -873,13 +830,18 @@ class NormCompiler(normListener):
 
     def exitFullTypeDeclaration(self, ctx: normParser.FullTypeDeclarationContext):
         type_implementation = self.stack.pop()
-        type_definition = self.stack.pop()
-        self.stack.append(FullTypeDeclaration(type_definition, type_implementation))
+        output_type_name = None
+        argument_declarations = None
+        if ctx.CL():
+            output_type_name = self.stack.pop()
+        if ctx.LBR():
+            argument_declarations = self.stack.pop()
+        type_name = self.stack.pop()
+        self.stack.append(FullTypeDeclaration(type_name, argument_declarations, output_type_name, type_implementation))
 
     def exitIncrementalTypeDeclaration(self, ctx:normParser.IncrementalTypeDeclarationContext):
-        type_implementation = self.stack.pop()
         type_name = self.stack.pop()
-        self.stack.append(IncrementalTypeDeclaration(type_name, type_implementation))
+        self.stack.append(IncrementalTypeDeclaration(type_name, ctx.code().getText()))
 
     def exitTypeName(self, ctx:normParser.TypeNameContext):
         typename = ctx.TYPENAME()
@@ -888,7 +850,7 @@ class NormCompiler(normListener):
             self.stack.append(TypeName(str(typename), version))
         elif ctx.LSBR():
             self.stack.append(ListType(self.stack.pop()))
-        elif ctx.OR():
+        elif ctx.SOR():
             t1 = self.stack.pop()
             t2 = self.stack.pop()
             t = UnionType([])
@@ -905,7 +867,8 @@ class NormCompiler(normListener):
             raise ValueError('Not a valid type name definition')
 
     def exitVariableName(self, ctx:normParser.VariableNameContext):
-        self.stack.append(VariableName(ctx.getText()))
+        name = ctx.getText()
+        self.stack.append(VariableName(name))
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
         type_name = self.stack.pop()
@@ -913,31 +876,17 @@ class NormCompiler(normListener):
         self.stack.append(ArgumentDeclaration(variable_name, type_name))
 
     def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):
-        arguments = []
-        for arg in ctx.children:
-            if isinstance(arg, normParser.ArgumentDeclarationContext):
-                arguments.append(self.stack.pop())
-        self.stack.append(list(reversed(arguments)))
-
-    def exitTypeDefinition(self, ctx:normParser.TypeDefinitionContext):
-        output_type_name = None
-        argument_declarations = None
-        if ctx.CL():
-            output_type_name = self.stack.pop()
-        if ctx.LBR():
-            argument_declarations = self.stack.pop()
-        type_name = self.stack.pop()
-        self.stack.append(TypeDefinition(type_name, argument_declarations, output_type_name))
+        arguments = [self.stack.pop() for arg in ctx.children
+                     if isinstance(arg, normParser.ArgumentDeclarationContext)]
+        self.stack.append(arguments)
 
     def exitTypeImplementation(self, ctx:normParser.TypeImplementationContext):
-        if ctx.LCBR():
-            self.stack.append(TypeImpl(CodeMode.QUERY, ctx.code().getText()))
-        elif ctx.PYTHON_BLOCK():
+        if ctx.PYTHON_BLOCK():
             self.stack.append(TypeImpl(CodeMode.PYTHON, ctx.code().getText()))
         elif ctx.KERAS_BLOCK():
             self.stack.append(TypeImpl(CodeMode.KERAS, ctx.code().getText()))
         else:
-            raise ValueError('Only query, python, or keras code blocks are supported')
+            self.stack.append(TypeImpl(CodeMode.QUERY, ctx.code().getText()))
 
     def exitUpdateExpression(self, ctx:normParser.UpdateExpressionContext):
         query_result = self.stack.pop()
