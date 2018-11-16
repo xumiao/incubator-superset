@@ -35,33 +35,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#comment_contents.
-    def enterComment_contents(self, ctx:normParser.Comment_contentsContext):
-        pass
-
-    # Exit a parse tree produced by normParser#comment_contents.
-    def exitComment_contents(self, ctx:normParser.Comment_contentsContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#namespaceExpression.
-    def enterNamespaceExpression(self, ctx:normParser.NamespaceExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#namespaceExpression.
-    def exitNamespaceExpression(self, ctx:normParser.NamespaceExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#namespace_name.
-    def enterNamespace_name(self, ctx:normParser.Namespace_nameContext):
-        pass
-
-    # Exit a parse tree produced by normParser#namespace_name.
-    def exitNamespace_name(self, ctx:normParser.Namespace_nameContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#namespace.
     def enterNamespace(self, ctx:normParser.NamespaceContext):
         pass
@@ -107,15 +80,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#magic_command.
-    def enterMagic_command(self, ctx:normParser.Magic_commandContext):
-        pass
-
-    # Exit a parse tree produced by normParser#magic_command.
-    def exitMagic_command(self, ctx:normParser.Magic_commandContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#version.
     def enterVersion(self, ctx:normParser.VersionContext):
         pass
@@ -140,15 +104,6 @@ class normListener(ParseTreeListener):
 
     # Exit a parse tree produced by normParser#variableName.
     def exitVariableName(self, ctx:normParser.VariableNameContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#querySign.
-    def enterQuerySign(self, ctx:normParser.QuerySignContext):
-        pass
-
-    # Exit a parse tree produced by normParser#querySign.
-    def exitQuerySign(self, ctx:normParser.QuerySignContext):
         pass
 
 
@@ -197,6 +152,15 @@ class normListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by normParser#baseQueryExpression.
+    def enterBaseQueryExpression(self, ctx:normParser.BaseQueryExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#baseQueryExpression.
+    def exitBaseQueryExpression(self, ctx:normParser.BaseQueryExpressionContext):
+        pass
+
+
     # Enter a parse tree produced by normParser#code.
     def enterCode(self, ctx:normParser.CodeContext):
         pass
@@ -224,24 +188,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#sliceExpression.
-    def enterSliceExpression(self, ctx:normParser.SliceExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#sliceExpression.
-    def exitSliceExpression(self, ctx:normParser.SliceExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#chainedExpression.
-    def enterChainedExpression(self, ctx:normParser.ChainedExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#chainedExpression.
-    def exitChainedExpression(self, ctx:normParser.ChainedExpressionContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#arithmeticExpression.
     def enterArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
         pass
@@ -257,6 +203,24 @@ class normListener(ParseTreeListener):
 
     # Exit a parse tree produced by normParser#conditionExpression.
     def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#sliceExpression.
+    def enterSliceExpression(self, ctx:normParser.SliceExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#sliceExpression.
+    def exitSliceExpression(self, ctx:normParser.SliceExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#chainedExpression.
+    def enterChainedExpression(self, ctx:normParser.ChainedExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#chainedExpression.
+    def exitChainedExpression(self, ctx:normParser.ChainedExpressionContext):
         pass
 
 
@@ -365,6 +329,15 @@ class normListener(ParseTreeListener):
 
     # Exit a parse tree produced by normParser#datetime.
     def exitDatetime(self, ctx:normParser.DatetimeContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#ommit.
+    def enterOmmit(self, ctx:normParser.OmmitContext):
+        pass
+
+    # Exit a parse tree produced by normParser#ommit.
+    def exitOmmit(self, ctx:normParser.OmmitContext):
         pass
 
 

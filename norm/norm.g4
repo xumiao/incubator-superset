@@ -5,76 +5,76 @@ script
     ;
 
 statement
-    : (comments)? namespaceExpression WSS? SEMICOLON
-    | (comments)? namespace? WSS? typeDeclaration WSS? SEMICOLON
-    | (comments)? queryExpression WSS? SEMICOLON
-    | (comments)? typeName (ASS | ORAS | ANDAS) queryExpression WSS? SEMICOLON
+    : comments SEMICOLON
+    | comments? imports WSS? SEMICOLON
+    | comments? namespace? WSS? typeDeclaration WSS? SEMICOLON
+    | comments? typeName (WSS? '=' WSS? | WSS? OR '=' WSS? | WSS? AND '=' WSS?) queryExpression WSS? SEMICOLON
+    | comments? queryExpression WSS? SEMICOLON
     ;
 
-COMMENT: '#' ~[\r\n]* NEWLINE;
+SINGLELINE: '//' ~[\r\n]* [\r\n]*;
+MULTILINE: '/*' (.)*? '*/' [\r\n]*;
 
-comments: '/*' comment_contents '*/' NEWLINE | COMMENT;
+comments: MULTILINE | SINGLELINE;
 
-comment_contents: ~('*/')+;
-
-namespaceExpression: namespace | imports;
-
-namespace_name: VARNAME (DOT VARNAME)*;
-
-namespace: SPACED_NAMESPACE namespace_name;
+namespace: SPACED_NAMESPACE VARNAME (DOT VARNAME)*;
 
 SPACED_NAMESPACE: 'namespace' [ \t]*;
 
-imports: SPACED_IMPORT namespace_name (DOT typeName)? (ALS TYPENAME)?;
+imports: SPACED_IMPORT VARNAME (DOT VARNAME)* (DOT typeName)? (WSS? AS WSS? VARNAME)?;
 
-SPACED_IMPORT: 'import' [ \t]*;
+SPACED_IMPORT: 'using' [ \t]*;
 
-argumentDeclaration: variableName CL typeName;
+argumentDeclaration: variableName WSS? COLON WSS? typeName;
 
-argumentDeclarations: argumentDeclaration (CA argumentDeclaration)*;
+argumentDeclarations: argumentDeclaration (WSS? COMMA WSS? argumentDeclaration)*;
 
-typeDeclaration : typeName (LBR argumentDeclarations RBR)? (CL typeName)?;
-
-magic_command
-    : SHOW
-    | CREATE
-    | UPDATE
-    | DELETE
-    ;
+typeDeclaration : typeName (LBR argumentDeclarations RBR)? (WSS? COLON WSS? typeName)?;
 
 version: '@' INTEGER?;
 
-typeName: TYPENAME version? | 'List' LSBR typeName RSBR | typeName OR typeName;
+typeName
+    : VARNAME version?
+    | 'List' LSBR typeName RSBR
+    | 'list' LSBR typeName RSBR
+    | typeName OR typeName;
 
-variableName : VARNAME | nativeProperty;
-
-querySign: '?' queryLimit?;
+variableName
+    : VARNAME
+    | nativeProperty
+    | variableName DOT VARNAME
+    | variableName DOT nativeProperty;
 
 queryLimit : INTEGER;
 
-queryProjection: querySign variableName?;
+queryProjection: '?' queryLimit? variableName?;
 
 argumentExpression
-    : '*'
+    : OMMIT
     | arithmeticExpression
-    | variableName ASS arithmeticExpression
+    | variableName WSS? '=' WSS? arithmeticExpression
+    | evaluationExpression
+    | variableName WSS? '=' WSS? evaluationExpression
     | queryProjection
     | variableName queryProjection
     | conditionExpression queryProjection?;
 
-argumentExpressions : argumentExpression (CA argumentExpression)*;
+argumentExpressions :  argumentExpression (WSS? COMMA WSS? argumentExpression)*;
 
 queryExpression
-    : constant queryProjection?
-    | codeExpression queryProjection?
-    | evaluationExpression queryProjection?
+    : baseQueryExpression queryProjection?
     | sliceExpression queryProjection?
     | chainedExpression queryProjection?
-    | arithmeticExpression queryProjection
-    | conditionExpression
-    | LBR queryExpression RBR
+    | LBR queryExpression RBR queryProjection?
     | NT queryExpression
     | queryExpression spacedLogicalOperator queryExpression
+    ;
+
+baseQueryExpression
+    : arithmeticExpression
+    | evaluationExpression
+    | codeExpression
+    | conditionExpression
     ;
 
 code: ~(KERAS_BLOCK|PYTHON_BLOCK|SQL_BLOCK|BLOCK_END)*;
@@ -82,13 +82,6 @@ code: ~(KERAS_BLOCK|PYTHON_BLOCK|SQL_BLOCK|BLOCK_END)*;
 codeExpression: (KERAS_BLOCK|PYTHON_BLOCK|SQL_BLOCK) code BLOCK_END;
 
 evaluationExpression: typeName LBR argumentExpressions? RBR;
-
-sliceExpression: typeName LSBR integer_c? CL integer_c? RSBR;
-
-chainedExpression
-    : evaluationExpression WSS? DOT WSS? (variableName | evaluationExpression)
-    |<assoc=right> chainedExpression WSS? DOT WSS? (variableName | evaluationExpression)
-    ;
 
 arithmeticExpression
     : constant
@@ -99,6 +92,13 @@ arithmeticExpression
     ;
 
 conditionExpression: arithmeticExpression spacedConditionOperator arithmeticExpression;
+
+sliceExpression: baseQueryExpression LSBR integer_c? WSS? COLON WSS? integer_c? RSBR;
+
+chainedExpression
+    : baseQueryExpression WSS? DOT WSS? (variableName | evaluationExpression)
+    |<assoc=right> chainedExpression WSS? DOT WSS? (variableName | evaluationExpression)
+    ;
 
 nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'version';
 
@@ -113,6 +113,7 @@ constant
     | uuid
     | url
     | datetime
+    | ommit
     ;
 
 none:        NONE;
@@ -125,6 +126,7 @@ pattern:     PATTERN;
 uuid:        UUID;
 url:         URL;
 datetime:    DATETIME;
+ommit:       OMMIT;
 
 logicalOperator: AND | OR | NOT | XOR | IMP | EQV;
 
@@ -139,6 +141,7 @@ arithmeticOperator: PLUS | MINUS | TIMES | DIVIDE | MOD | EXP;
 spacedArithmeticOperator: WSS? arithmeticOperator WSS?;
 
 WSS: [ \t\u000C\r\n]+;
+NEWLINE: [\r\n]+;
 
 LBR: '(' WSS?;
 RBR: WSS? ')';
@@ -150,6 +153,7 @@ LSBR: '[' WSS?;
 RSBR: WSS? ']';
 
 NONE:      'none' | 'null' | 'na';
+AS:        'as';
 IN:        'in';
 NIN:       '!in';
 AND:       '&';
@@ -176,11 +180,11 @@ TIMES:     '*';
 XOR:       '^';
 IMP:       '=>';
 EQV:       '<=>';
+OMMIT:     '...';
 
 BOOLEAN:    'true' | 'false';
 INTEGER:    [+-]? DIGIT+;
 FLOAT:      [+-]? DIGIT+ DOT DIGIT+ ('e' [+-]? DIGIT+)?;
-NEWLINE:    '\r'? '\n';
 STRING:     '"' ( ~["\r\n\t] )*? '"' | '\'' ( ~['\r\n\t] )*? '\'' ;
 
 UNICODE:   'u' STRING;
@@ -202,23 +206,9 @@ SQL_BLOCK : '{%sql' WSS?;
 
 BLOCK_END : '%}';
 
-ORAS : WSS? OR '=' WSS?;
-
-ANDAS : WSS? AND '=' WSS?;
-
 NT: NOT [ \t]*;
 
-CA: WSS? COMMA WSS?;
-
-CL: WSS? COLON WSS?;
-
-ASS: WSS? '=' WSS?;
-
-ALS: WSS? 'as' WSS?;
-
-TYPENAME: [A-Z][a-zA-Z0-9]*;
-
-VARNAME: [a-z][a-zA-Z0-9_]*;
+VARNAME: [a-zA-Z][a-zA-Z0-9_]*;
 
 fragment DIGIT:      [0] | NONZERO;
 fragment NONZERO:    [1-9];

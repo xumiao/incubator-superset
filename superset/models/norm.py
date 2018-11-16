@@ -141,7 +141,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
         root = config.get('DATA_STORAGE_ROOT')
         return '{}/{}/{}.parquet'.format(root, self.namespace, self.name)
 
-    def query(self, filters=None, projections=None):
+    def query(self, assignments=None, filters=None, projections=None):
         if projections is None:
             df = pd.read_parquet(self.data_file)
         else:

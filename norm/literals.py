@@ -1,10 +1,13 @@
 from enum import Enum
 
+OMMIT = '...'
+
 
 class CodeMode(Enum):
     QUERY = ''
     PYTHON = '%python'
     KERAS = '%keras'
+    SQL = '%sql'
 
 
 class AOP(Enum):
@@ -46,3 +49,9 @@ class ConstantType(Enum):
     UID = 'uuid'
     URL = 'url'
     DTM = 'datetime'
+
+
+class ImplType(Enum):
+    ASS = 'assign'
+    ORAS = 'or_assign'
+    ANDAS = 'and_assign'
