@@ -2,12 +2,26 @@ import json
 
 from sqlalchemy import (
     Column, Integer, String, Text, func,
-    UniqueConstraint)
+    UniqueConstraint, ForeignKey)
 from sqlalchemy.orm import make_transient
+from flask_appbuilder import Model
+
 import logging
 import traceback
-
 logger = logging.getLogger(__name__)
+
+
+class Version(Model):
+    """
+    Version lambdas
+    """
+
+    __tablename__ = 'versions'
+
+    id = Column(Integer, primary_key=True)
+    namespace = Column(String(1024), default='')
+    name = Column(String(256), nullable=False)
+    max_ver = Column(Integer, default=0)
 
 
 class VersionedMixin(object):
@@ -17,18 +31,15 @@ class VersionedMixin(object):
     __versioned__ = True
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    namespace = Column(String(1000), default='')
-    name = Column(String(250), nullable=False)
+    namespace = Column(String(1024), default='')
+    name = Column(String(256), nullable=False)
     version = Column(Integer, default=1, nullable=False)
 
-    def __init__(self, name='', version=None, namespace=''):
+    def __init__(self, namespace='', name=''):
+        self.id = None
+        self.namspace = namespace
         self.name = name
-        self.namespace = namespace
-        if version is not None:
-            if isinstance(version, int):
-                self.version = version
-            else:
-                raise ValueError('Version can only be integer')
+        self.version = self.new_version()
 
     def __repr__(self):
         return str(self)
@@ -43,34 +54,26 @@ class VersionedMixin(object):
         else:
             return '@'.join((self.name, str(self.version)))
 
-    def set_version(self, session=None):
-        """
-        Set the version of this model. We find the largest version in the database for this model name,
-        increment on top of that.
-        :param session: sqlalchemy session
-        """
-        if self.version is not None:
-            return
-
-        tc = self.__class__
-        if session is None:
-            from titan import db
-            session = db.session
-        _, v = session.query(tc, func.max(tc.version)).filter(tc.name == self.name).first()
-        if v is None:
-            self.version = 1
-        else:
-            self.version = v + 1
-
-    def new_version(self, session):
+    def new_version(self):
         """
         Create a new version for this object
-        :param session: sqlalchemy session
         """
-        make_transient(self)
-        self.version = None
-        self.set_version(session)
-        self.id = None
+        from superset import db
+        ver = db.session.query(Version).filter(Version.namespace == self.namespace,
+                                               Version.name == self.name).first()
+        if ver is None:
+            ver = Version(namespace=self.namespace, name=self.name)
+            db.session.add(ver)
+        ver.max_ver = Version.max_ver + 1
+        return ver.max_ver
+
+    def clone(self):
+        # TODO: clone a new versioned self
+        pass
+
+    def merge(self, others):
+        # TODO: merge others into self and create a new version
+        pass
 
 
 def lazy_property(f):

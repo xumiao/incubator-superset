@@ -60,6 +60,19 @@ class Variable(Model, ParametrizedMixin):
         self.as_input = as_input
         self.as_output = as_output
 
+    def __eq__(self, other):
+        if not isinstance(other, Variable):
+            return False
+
+        if self.id == other.id:
+            return True
+
+        if self.name == other.name and self.type_id == other.type_id and \
+                self.as_input == other.as_input and self.as_output == other.as_output:
+            return True
+
+        return False
+
 
 lambda_user = Table(
     'lambda_user', metadata,
@@ -127,7 +140,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
                               user=user or self.creator)
 
     @property
-    def description_markeddown(self):
+    def description_markdown(self):
         return utils.markdown(self.description)
 
     def __call__(self, *args, **kwargs):

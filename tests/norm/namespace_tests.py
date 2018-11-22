@@ -5,6 +5,7 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import unittest
+from tests.norm.utils import user_tester
 from norm import execute, get_compiler
 from superset import db
 
@@ -13,7 +14,7 @@ class NamespaceTestCase(unittest.TestCase):
 
     def setUp(self):
         self.session = db.session
-        self.user = 'tester'
+        self.user = user_tester()
 
     def test_recognize_importing(self):
         script = """

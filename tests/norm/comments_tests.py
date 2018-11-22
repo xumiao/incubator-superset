@@ -7,29 +7,30 @@ from __future__ import unicode_literals
 import unittest
 from norm import execute
 from superset import db
+from tests.norm.utils import user_tester
 
 
 class CommentsTestCase(unittest.TestCase):
 
     def setUp(self):
         self.session = db.session
-        self.user = 'tester'
+        self.user = user_tester()
 
     def test_recognize_single_line_comment1(self):
         script = """
         // Comment 1
         ;
         """
-        exe = execute(script, self.session, self.user)
-        self.assertEqual(exe, 'Comment 1')
+        res = execute(script, self.session, self.user)
+        self.assertEqual(res, 'Comment 1')
 
     def test_recognize_single_line_comment2(self):
         script = """
         // \tComment 2
         ;
         """
-        exe = execute(script, self.session, self.user)
-        self.assertEqual(exe, 'Comment 2')
+        res = execute(script, self.session, self.user)
+        self.assertEqual(res, 'Comment 2')
 
     def test_fail_single_line_comment1(self):
         script = """
@@ -45,8 +46,8 @@ class CommentsTestCase(unittest.TestCase):
         /* Comment 4 */
         ;
         """
-        exe = execute(script, self.session, self.user)
-        self.assertEqual(exe, 'Comment 4')
+        res = execute(script, self.session, self.user)
+        self.assertEqual(res, 'Comment 4')
 
     def test_recognize_multi_line_comment2(self):
         script = """
@@ -55,8 +56,8 @@ class CommentsTestCase(unittest.TestCase):
         */
         ;
         """
-        exe = execute(script, self.session, self.user)
-        self.assertEqual(exe, "Comment 5")
+        res = execute(script, self.session, self.user)
+        self.assertEqual(res, "Comment 5")
 
     def test_recognize_multi_line_comment3(self):
         script = """
@@ -67,8 +68,8 @@ class CommentsTestCase(unittest.TestCase):
         */
         ;
         """
-        exe = execute(script, self.session, self.user)
-        self.assertEqual(exe, "Comment 6\n    and\n    more ...")
+        res = execute(script, self.session, self.user)
+        self.assertEqual(res, "Comment 6\n    and\n    more ...")
 
     def test_fail_multi_line_comment4(self):
         script = """

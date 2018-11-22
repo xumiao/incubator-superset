@@ -3,7 +3,7 @@ from norm.executable import NormExecutable
 
 class VariableName(NormExecutable):
 
-    def __init__(self, variable, attribute):
+    def __init__(self, variable, attribute=None):
         """
         The variable and its recursive attributes
         :param variable: the variable
@@ -17,7 +17,10 @@ class VariableName(NormExecutable):
 
     @property
     def name(self):
-        return self.variable.name + '.' + self.attribute
+        if isinstance(self.variable, VariableName):
+            return self.variable.name + '.' + self.attribute
+        else:
+            return self.variable
 
     def execute(self, session, user, context):
         """

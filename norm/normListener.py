@@ -224,15 +224,6 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#nativeProperty.
-    def enterNativeProperty(self, ctx:normParser.NativePropertyContext):
-        pass
-
-    # Exit a parse tree produced by normParser#nativeProperty.
-    def exitNativeProperty(self, ctx:normParser.NativePropertyContext):
-        pass
-
-
     # Enter a parse tree produced by normParser#constant.
     def enterConstant(self, ctx:normParser.ConstantContext):
         pass

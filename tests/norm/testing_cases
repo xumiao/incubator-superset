@@ -1,0 +1,68 @@
+// Declare lambdas
+namespace norm.test
+test(a:String, b:Int);
+
+// Adding some data
+test = 'sfs' & 4
+     | 'fff' & 1
+     ;
+test('aa', 6);
+
+// Query the data
+test;
+test(...);
+test(a?);
+test(a?, b?);
+test(a=='sfs', b?);
+test(a?, b>2);
+test(a~'s', b>3?);
+
+// Define the probability distribution
+test &= gaussian(mu=2, gamma=0.1, b)?prob;
+
+// Add another attribute
+test(..., t:Datetime);
+
+// Add another attribute and values
+using time.now
+test &= now()?t2; // automatically adding t2 as a Datetime type (inferred by the now output type)
+
+// Sort on an attribute
+test.sort(by=t, ascending=False);
+
+// Group by an attribute and taking the mean
+test.group(by=t).mean(on=[a, b]);
+
+// Extract a pattern on an attribute
+test(a?) & extract(a, r'sf')?sf;
+
+// Extract a pattern on multiple attributes
+test(a?) & extract(a, r'sf{\W+}{[0-9]+}')?(v1, v2);
+
+
+// Access a nested attribute
+test(..., p:person);
+test(p?) & extract(p.name, r'tom')?is_tom;
+
+
+// Slicing with one object
+test[1];
+
+// Slicing with multiple object
+test[3:7];
+test[:9];
+test[2:];
+test[:-2];
+
+// Chaining
+test.p.group(by=name);
+
+// Row-wise expansion with vectorized inputs
+// match(s:String, p:Pattern)
+// the following will cross product test with [r's', r'sf', r'aa']
+test & match(test.a, [r's', r'sf', r'aa'])?matched;
+
+// Column-wise expansion with list comprehension
+test &= [match(a, p)?var(v+p) for p in [r's', r'sf', r'aa']];
+
+

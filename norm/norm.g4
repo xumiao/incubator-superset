@@ -35,15 +35,11 @@ version: '@' INTEGER?;
 
 typeName
     : VARNAME version?
-    | 'List' LSBR typeName RSBR
-    | 'list' LSBR typeName RSBR
-    | typeName OR typeName;
+    | LSBR typeName RSBR;
 
 variableName
     : VARNAME
-    | nativeProperty
-    | variableName DOT VARNAME
-    | variableName DOT nativeProperty;
+    | variableName DOT VARNAME;
 
 queryLimit : INTEGER;
 
@@ -93,14 +89,12 @@ arithmeticExpression
 
 conditionExpression: arithmeticExpression spacedConditionOperator arithmeticExpression;
 
-sliceExpression: baseQueryExpression LSBR integer_c? WSS? COLON WSS? integer_c? RSBR;
+sliceExpression: baseQueryExpression LSBR integer_c? WSS? COLON? WSS? integer_c? RSBR;
 
 chainedExpression
     : baseQueryExpression WSS? DOT WSS? (variableName | evaluationExpression)
     |<assoc=right> chainedExpression WSS? DOT WSS? (variableName | evaluationExpression)
     ;
-
-nativeProperty: 'prob' | 'label' | 'tag' | 'uid' | 'tensor' | 'version';
 
 constant
     : none
@@ -180,7 +174,7 @@ TIMES:     '*';
 XOR:       '^';
 IMP:       '=>';
 EQV:       '<=>';
-OMMIT:     '...';
+OMMIT:     '..';
 
 BOOLEAN:    'true' | 'false';
 INTEGER:    [+-]? DIGIT+;

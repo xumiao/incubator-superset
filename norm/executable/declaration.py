@@ -1,6 +1,7 @@
 import pandas as pd
 
 from norm.executable import NormExecutable
+from superset.models.norm import Lambda
 
 
 class ArgumentDeclaration(NormExecutable):
@@ -44,32 +45,32 @@ class TypeDeclaration(NormExecutable):
         self.type_name = type_name
         self.argument_declarations = argument_declarations
         self.output_type_name = output_type_name
-        self.expr = None
-        self.namespace = ''
-        self.description = ''
-
-    def create_lambda(self, namespace, description, params, variables, user):
-        from superset.models.norm import Lambda
-        name = self.type_name.name
-        version = self.type_name.version
-        code = self.expr.code()
-        return Lambda(namespace=namespace, name=name, version=version, description=description, params=params,
-                      variables=variables, code=code, user=user)
+        self.namespace = None
+        self.description = None
 
     def execute(self, session, user, context):
         # TODO: optimize to query db in batch for all types or utilize cache
         variables = [var_declaration.execute(session, user, context) for var_declaration in
                      reversed(self.argument_declarations)]
-        # TODO: extract description from comments
-        lam = self.type_name.execute(session, user, context)
-        if not lam:
-            lam = self.create_lambda(self.namespace, self.description, '{}', variables, user)
+        self.type_name.namespace = self.namespace
+        lam = self.type_name.execute(session, user, context)  # type: Lambda
+        if lam.id is None:
+            # lam is newly created
+            lam.description = self.description
+            lam.variables = variables
             session.add(lam)
         else:
-            # TODO: deal with versioning
-            lam.variables = variables
-            lam.code = self.expr.code()
-
+            # lam might be modified
+            # TODO: use sqlalchemy session to determine whether lam is dirty or not
+            dirty = False
+            if self.description and lam.description != self.description:
+                lam.description = self.description
+                dirty = True
+            if lam.variables != variables:
+                lam.variables = variables
+                dirty = True
+            if dirty:
+                lam.new_version(session)
         session.commit()
         return pd.DataFrame(data=[['succeed', '{} has been created'.format(lam.signature)]],
                             columns=['status', 'message'])

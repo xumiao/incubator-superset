@@ -31,6 +31,10 @@ class Constant(object):
         self.value = value
 
 
+class NormError(RuntimeError):
+    pass
+
+
 class NormExecutable(object):
     """
     Execute Norm Command

@@ -187,12 +187,12 @@ class NormCompiler(normListener):
         self.stack.append(ArgumentDeclaration(variable_name, type_name))
 
     def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):
-        args = [self.stack.pop() for ch in ctx.children
-                if isinstance(ch, normParser.ArgumentDeclarationContext)]
-        self.stack.append(args)
+        args = reversed([self.stack.pop() for ch in ctx.children
+                         if isinstance(ch, normParser.ArgumentDeclarationContext)])
+        self.stack.append(list(args))
 
     def exitTypeDeclaration(self, ctx:normParser.TypeDeclarationContext):
-        output_type_name = ctx.typeName(1)
+        output_type_name = self.stack.pop() if ctx.typeName(1) else None
         args = self.stack.pop() if ctx.argumentDeclarations() else None
         type_name = self.stack.pop()
         self.stack.append(TypeDeclaration(type_name, args, output_type_name))
@@ -204,30 +204,16 @@ class NormCompiler(normListener):
             self.stack.append(TypeName(str(typename), version))
         elif ctx.LSBR():
             self.stack.append(ListType(self.stack.pop()))
-        elif ctx.OR():
-            t1 = self.stack.pop()
-            t2 = self.stack.pop()
-            t = UnionType([])
-            if isinstance(t2, UnionType):
-                t.types.extend((tt for tt in t2.types if tt not in t))
-            else:
-                t.types.append(t2)
-            if isinstance(t1, UnionType):
-                t.types.extend((tt for tt in t1.types if tt not in t))
-            else:
-                t.types.append(t1)
-            self.stack.append(t)
         else:
             raise ParseError('Not a valid type name definition')
 
     def exitVariableName(self, ctx:normParser.VariableNameContext):
-        if ctx.VARNAME():
-            attribute = ctx.VARNAME().getText()
-        else:
-            attribute = ctx.nativeProperty().getText()
-
+        attribute = ctx.VARNAME().getText()
         variable = self.stack.pop() if ctx.variableName() else None
-        self.stack.append(VariableName(variable, attribute))
+        if variable is not None:
+            self.stack.append(VariableName(variable, attribute))
+        else:
+            self.stack.append(VariableName(attribute))
 
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
         var = None
