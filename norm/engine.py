@@ -3,9 +3,11 @@ import re
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
 from dateutil import parser as dateparser
+from functools import lru_cache
+from textwrap import dedent
 
 from norm import config
-from norm.executable import Constant, Projection
+from norm.executable import Constant, Projection, NormExecutable
 from norm.executable.declaration import *
 from norm.executable.expression.arithmetic import *
 from norm.executable.expression.code import *
@@ -43,7 +45,7 @@ class NormCompiler(normListener):
 
     def __init__(self, context_id):
         self.context_id = context_id
-        self.namespaces = set()
+        self.namespaces = {'', 'norm.natives'}
         self.stack = []
         self.variables = {}
         self.df = None
@@ -302,3 +304,24 @@ class NormCompiler(normListener):
             self.stack.append(CodeExpr(CodeMode.SQL, ctx.code().getText()))
         else:
             self.stack.append(CodeExpr(CodeMode.QUERY, ctx.code().getText()))
+
+
+@lru_cache(maxsize=128)
+def get_compiler(context_id):
+    """
+    Get the compiler with respect to the context id
+    :param context_id: the id for the context
+    :type context_id: int
+    :return: a norm compiler
+    :rtype: NormCompiler
+    """
+    return NormCompiler(context_id)
+
+
+def execute(script, session, user, context_id=None):
+    compiler = get_compiler(context_id)
+    exe = compiler.compile(dedent(script))
+    if isinstance(exe, NormExecutable):
+        return exe.execute(session, user, compiler)
+    else:
+        return exe

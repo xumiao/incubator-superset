@@ -1,7 +1,7 @@
 import pandas as pd
 
 from norm.executable import NormExecutable
-from superset.models.norm import Lambda
+from norm.models.norm import Lambda
 
 
 class ArgumentDeclaration(NormExecutable):
@@ -23,10 +23,16 @@ class ArgumentDeclaration(NormExecutable):
         Create variables or retrieve variables
         :rtype: superset.models.norm.Variable
         """
-        from superset.models.norm import Variable
+        lam = self.variable_type.execute(session, user, context)
+        assert(lam is not None)
 
-        return Variable(self.variable_name.name,
-                        self.variable_type.execute(session, user, context))
+        from norm.models.norm import Variable
+        var = session.query(Variable).filter(Variable.name == self.variable_name.name,
+                                             Variable.type_id == lam.id).scalar()
+        if var is None:
+            return Variable(self.variable_name.name, lam)
+        else:
+            return var
 
 
 class TypeDeclaration(NormExecutable):

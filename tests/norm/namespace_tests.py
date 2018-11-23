@@ -6,8 +6,8 @@ from __future__ import unicode_literals
 
 import unittest
 from tests.norm.utils import user_tester
-from norm import execute, get_compiler
-from superset import db
+from norm.config import db
+from norm.engine import execute, get_compiler
 
 
 class NamespaceTestCase(unittest.TestCase):

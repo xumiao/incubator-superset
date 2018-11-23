@@ -4,12 +4,12 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from sqlalchemy import Column, Integer, String, exists
+from sqlalchemy import Column, Integer, String
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from superset import db
-from superset.models.norm import Lambda, Variable
+from norm.models.norm import Lambda, Variable
 
 import logging
 import traceback

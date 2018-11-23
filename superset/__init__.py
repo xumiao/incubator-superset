@@ -173,6 +173,13 @@ security_manager = appbuilder.sm
 
 results_backend = app.config.get('RESULTS_BACKEND')
 
+# Connecting norm packages
+import norm.config as normconfig
+from flask_appbuilder import Model
+normconfig.db = db
+normconfig.Model = Model
+normconfig.user_model = security_manager.user_model
+
 # Registering sources
 module_datasource_map = app.config.get('DEFAULT_MODULE_DS_MAP')
 module_datasource_map.update(app.config.get('ADDITIONAL_MODULE_DS_MAP'))
@@ -189,3 +196,4 @@ if flask_app_mutator:
     flask_app_mutator(app)
 
 from superset import views  # noqa
+

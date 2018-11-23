@@ -5,9 +5,9 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import unittest
-from norm import execute
-from superset import db
 from tests.norm.utils import user_tester
+from norm.config import db
+from norm.engine import execute
 
 
 class CommentsTestCase(unittest.TestCase):

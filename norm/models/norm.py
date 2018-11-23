@@ -8,20 +8,13 @@ from textwrap import dedent
 
 from future.standard_library import install_aliases
 
-from flask_appbuilder import Model
-
 from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean
 from sqlalchemy import Table
 from sqlalchemy.ext.hybrid import hybrid_property
-
 from sqlalchemy.orm import relationship, with_polymorphic
 
-from superset import app, utils
-from superset import security_manager as sm
-
-from superset.models.helpers import AuditMixinNullable
-from superset.models.mixins import VersionedMixin, lazy_property, ParametrizedMixin
-from superset.models.core import metadata
+from norm.models.mixins import VersionedMixin, lazy_property, ParametrizedMixin
+import norm.config as config
 
 from pandas import DataFrame
 import pandas as pd
@@ -32,7 +25,9 @@ logger = logging.getLogger(__name__)
 
 install_aliases()
 
-config = app.config
+Model = config.Model
+metadata = Model.metadata
+user_model = config.user_model
 
 
 class Variable(Model, ParametrizedMixin):
@@ -42,12 +37,10 @@ class Variable(Model, ParametrizedMixin):
 
     id = Column(Integer, primary_key=True)
     name = Column(String(256), default='')
-    as_input = Column(Boolean, default=True)
-    as_output = Column(Boolean, default=True)
     type_id = Column(Integer, ForeignKey('lambdas.id'))
     type_ = relationship('Lambda', foreign_keys=[type_id])
 
-    def __init__(self, name, type_, as_input=True, as_output=True):
+    def __init__(self, name, type_):
         """
         Construct the variable
         :param name: the full name of the variable
@@ -55,30 +48,16 @@ class Variable(Model, ParametrizedMixin):
         :param type_: the type of the variable
         :type type_: Lambda
         """
+        self.id = None
         self.name = name
         self.type_ = type_
-        self.as_input = as_input
-        self.as_output = as_output
-
-    def __eq__(self, other):
-        if not isinstance(other, Variable):
-            return False
-
-        if self.id == other.id:
-            return True
-
-        if self.name == other.name and self.type_id == other.type_id and \
-                self.as_input == other.as_input and self.as_output == other.as_output:
-            return True
-
-        return False
 
 
 lambda_user = Table(
     'lambda_user', metadata,
     Column('id', Integer, primary_key=True),
     Column('lambda_id', Integer, ForeignKey('lambdas.id')),
-    Column('user_id', Integer, ForeignKey('ab_user.id')),
+    Column('user_id', Integer, ForeignKey(user_model.id)),
 )
 
 lambda_variable = Table(
@@ -89,7 +68,7 @@ lambda_variable = Table(
 )
 
 
-class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
+class Lambda(Model, VersionedMixin, ParametrizedMixin):
     """Lambda model is a function"""
 
     __tablename__ = 'lambdas'
@@ -98,7 +77,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
     perm = Column(String(1024))
     code = Column(Text, default='')
     category = Column(String(128))
-    owners = relationship(sm.user_model, secondary=lambda_user)
+    owners = relationship(user_model, secondary=lambda_user)
     variables = relationship(Variable, secondary=lambda_variable)
 
     __mapper_args__ = {
@@ -139,10 +118,6 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
                               variables=self.variables,
                               user=user or self.creator)
 
-    @property
-    def description_markdown(self):
-        return utils.markdown(self.description)
-
     def __call__(self, *args, **kwargs):
         """
         TODO: implement
@@ -151,7 +126,7 @@ class Lambda(Model, AuditMixinNullable, VersionedMixin, ParametrizedMixin):
 
     @property
     def data_file(self):
-        root = config.get('DATA_STORAGE_ROOT')
+        root = config.DATA_STORAGE_ROOT
         return '{}/{}/{}.parquet'.format(root, self.namespace, self.name)
 
     def query(self, assignments=None, filters=None, projections=None):

@@ -20,7 +20,7 @@ logger = logging.getLogger('alembic.env')
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
+from norm.models import *
 from flask import current_app
 
 config.set_main_option('sqlalchemy.url',

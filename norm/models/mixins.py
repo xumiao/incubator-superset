@@ -4,14 +4,15 @@ from sqlalchemy import (
     Column, Integer, String, Text, func,
     UniqueConstraint, ForeignKey)
 from sqlalchemy.orm import make_transient
-from flask_appbuilder import Model
+
+import norm.config as config
 
 import logging
 import traceback
 logger = logging.getLogger(__name__)
 
 
-class Version(Model):
+class Version(config.Model):
     """
     Version lambdas
     """

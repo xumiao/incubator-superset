@@ -1,9 +1,9 @@
 from sqlalchemy.orm import with_polymorphic
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 
 from norm.executable import NormExecutable, NormError
-from superset.models.natives import ListLambda
-from superset.models.norm import Lambda
+from norm.models.natives import ListLambda
+from norm.models.norm import Lambda, lambda_user, lambda_variable, Variable
 
 
 class TypeName(NormExecutable):
@@ -33,7 +33,6 @@ class TypeName(NormExecutable):
         Note that user is encoded by the version.
         :rtype: Lambda
         """
-        # TODO: handle exceptions
         if self.namespace is not None:
             namespaces = [self.namespace]
         else:
@@ -41,19 +40,19 @@ class TypeName(NormExecutable):
 
         if self.version is None:
             #  find the latest version
-            lam = session.query(with_polymorphic(Lambda, '*')) \
-                .filter(Lambda.namespace.in_(namespaces),
-                        Lambda.name == self.name,
-                        Lambda.owners.in_([user, None]))\
-                .order_by(desc(Lambda.version))\
-                .first()
+            lam = session.query(with_polymorphic(Lambda, '*'), lambda_user) \
+                         .outerjoin(lambda_user) \
+                         .filter(Lambda.namespace.in_(namespaces),
+                                 Lambda.name == self.name,
+                                 or_(lambda_user.c.user_id == None,
+                                     lambda_user.c.user_id == user.id)) \
+                         .order_by(desc(Lambda.version)).scalar()
         else:
             lam = session.query(with_polymorphic(Lambda, '*')) \
                 .filter(Lambda.namespace.in_(namespaces),
                         Lambda.name == self.name,
-                        Lambda.version == self.version,
-                        Lambda.owners.in_([user, None]))\
-                .first()
+                        Lambda.version == self.version)\
+                .scalar()
 
         if lam is None:
             #  create a new Lambda
@@ -62,6 +61,7 @@ class TypeName(NormExecutable):
             version = self.version or self.DEFAULT_VERSION
             lam = Lambda(namespace=namespace, name=self.name, version=version, user=user)
 
+        assert(isinstance(lam, Lambda))
         return lam
 
 
@@ -85,7 +85,9 @@ class ListType(NormExecutable):
         if lam.id is None:
             raise NormError("{} does not seem to be declared yet".format(self.intern))
 
-        llam = session.query(ListLambda).filter(ListLambda.variables == [lam]).first()
+        q = session.query(ListLambda, Variable).join(ListLambda.variables)\
+            .filter(Variable.type_id == lam.id)
+        llam = q.scalar()
         if llam is None:
             # create a new ListLambda
             llam = ListLambda(lam)

@@ -37,7 +37,7 @@ def init():
 @manager.command
 def init_norm():
     """Inits the Norm models"""
-    from superset.models.natives import Register
+    from norm.models.natives import Register
     Register.register()
 
 
