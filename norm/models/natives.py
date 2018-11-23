@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 
-from superset import db
+from norm.config import db
 from norm.models.norm import Lambda, Variable
 
 import logging
