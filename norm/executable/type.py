@@ -3,7 +3,7 @@ from sqlalchemy import desc, or_
 
 from norm.executable import NormExecutable, NormError
 from norm.models.natives import ListLambda
-from norm.models.norm import Lambda, Variable, Status
+from norm.models.norm import Lambda, Variable, Status, retrieve_type
 
 
 class TypeName(NormExecutable):
@@ -36,30 +36,32 @@ class TypeName(NormExecutable):
             namespaces = [self.namespace]
         else:
             namespaces = context.namespaces
+        lam = retrieve_type(namespaces, self.name, self.version, session)
+        if lam is None:
+            #  create a new Lambda
+            lam = Lambda(namespace=self.namespace or self.DEFAULT_NAMESPACE,
+                         name=self.name)
+        return lam
 
+"""
         if self.version is None:
             #  find the latest version
             lam = session.query(with_polymorphic(Lambda, '*')) \
                          .filter(Lambda.namespace.in_(namespaces),
                                  Lambda.name == self.name,
                                  Lambda.status == Status.READY) \
-                         .order_by(desc(Lambda.version)).scalar()
+                         .order_by(desc(Lambda.version))\
+                         .scalar()
         else:
             lam = session.query(with_polymorphic(Lambda, '*')) \
-                .filter(Lambda.namespace.in_(namespaces),
-                        Lambda.name == self.name,
-                        Lambda.status == Status.READY,
-                        Lambda.version == self.version)\
-                .scalar()
+                         .filter(Lambda.namespace.in_(namespaces),
+                                 Lambda.name == self.name,
+                                 Lambda.status == Status.READY,
+                                 Lambda.version == self.version)\
+                         .scalar()
         # TODO: Check permissions for the user
+"""
 
-        if lam is None:
-            #  create a new Lambda
-            namespace = self.namespace or self.DEFAULT_NAMESPACE
-            lam = Lambda(namespace=namespace, name=self.name)
-
-        assert(isinstance(lam, Lambda))
-        return lam
 
 
 class ListType(NormExecutable):

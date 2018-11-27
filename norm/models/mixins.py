@@ -1,5 +1,5 @@
 import norm.config as config
-from sqlalchemy import Column, Integer, String, Text
+from sqlalchemy import Column, Integer, String, Text, exists, and_
 
 import json
 import logging
@@ -14,7 +14,7 @@ class Version(config.Model):
 
     __tablename__ = 'versions'
 
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, autoincrement=True)
     namespace = Column(String(512), default='')
     name = Column(String(256), nullable=False)
     max_ver = Column(Integer, default=0)
@@ -28,14 +28,19 @@ def new_version(namespace, name):
     :return: the version
     :rtype: Column
     """
-    ver = config.db.session.query(Version).filter(Version.namespace == namespace,
-                                                  Version.name == name).first()
-    if ver is None:
+    in_store = config.db.session.query(exists().where(and_(Version.namespace == namespace,
+                                                      Version.name == name))).scalar()
+    if not in_store:
         ver = Version(namespace=namespace, name=name, max_ver=1)
         config.db.session.add(ver)
+        return ver.max_ver
     else:
-        ver.max_ver = Version.max_ver + 1
-    return ver.max_ver
+        ver = config.db.engine.execute("""
+        UPDATE versions SET max_ver = max_ver + 1
+        WHERE namespace = '{}' AND name = '{}'
+        RETURNING max_ver;
+        """.format(namespace, name)).fetchone()[0]
+        return ver
 
 
 def lazy_property(f):

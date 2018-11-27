@@ -63,6 +63,13 @@ class NativeLambda(Lambda):
                          variables=variables)
         self.status = Status.READY
 
+    def load_data(self):
+        """
+        Native lambdas do not have data
+        :return: None
+        """
+        return None
+
 
 @Register()
 class TypeLambda(NativeLambda):

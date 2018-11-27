@@ -10,7 +10,7 @@ import enum
 
 from future.standard_library import install_aliases
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, DateTime, Enum
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, DateTime, Enum, desc, UniqueConstraint
 from sqlalchemy import Table
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -19,8 +19,6 @@ from sqlalchemy.orm import relationship, with_polymorphic
 from norm.models.mixins import lazy_property, ParametrizedMixin, new_version
 from norm.models.utils import current_user
 import norm.config as config
-
-from flask import g
 
 from pandas import DataFrame
 import pandas as pd
@@ -168,6 +166,8 @@ class Lambda(Model, ParametrizedMixin):
         'polymorphic_on': category
     }
 
+    __table_args__ = tuple(UniqueConstraint('namespace', 'name', 'version', name='unique_lambda'))
+
     def __init__(self, namespace='', name='', description='', params='', variables=None):
         self.id = None
         self.namespace = namespace
@@ -200,18 +200,16 @@ class Lambda(Model, ParametrizedMixin):
         else:
             return '@'.join((self.name, str(self.version)))
 
-    def clone(self, user=None):
+    def clone(self):
         """
         Clone itself and bump up the version. Make sure updates are done after clone.
-        :param user: the user that clones the current version
-        :type user: user_model
         :return: the cloned version of it
         :rtype: Lambda
         """
-        user = user or g.user
         lam = self.__class__(namespace=self.namespace, name=self.name, description=self.description,
-                             params=self.params, code=self.code, variables=self.variables, user=user)
+                             params=self.params, variables=self.variables)
         lam.cloned_from = self
+        lam.anchor = False
         return lam
 
     def merge(self, others, strategy='or'):
@@ -248,21 +246,21 @@ class Lambda(Model, ParametrizedMixin):
 
     def compact(self):
         """
-        Compact this version with previous versions to make it an anchor version
+        Compact this version with previous versions to make it an anchor
         :return:
         """
         pass
 
     def rollback(self):
         """
-        Rollback to the previous revision
+        Rollback to the previous revision if it is in draft status
         :return:
         """
         pass
 
     def forward(self):
         """
-        Forward to the next revision
+        Forward to the next revision if it is in draft status
         :return:
         """
         pass
@@ -277,6 +275,28 @@ class Lambda(Model, ParametrizedMixin):
     def data_file(self):
         root = config.DATA_STORAGE_ROOT
         return '{}/{}/{}.parquet'.format(root, self.namespace, self.name)
+
+    def load_data(self):
+        """
+        Load data if it exists. If the current version is not an anchor, the previous versions will be combined.
+        :return: the combined data
+        :rtype: DataFrame
+        """
+        blocks = []
+        lam = self
+        while not lam.anchor:
+            blocks.append(lam)
+            if lam.cloned_from is None:
+                msg = 'Can not find the anchor version for {}.{} before the chain is broken\n' \
+                          .format(lam.namespace, lam.name) + \
+                      '{}'.format([l.version for l in blocks])
+                raise RuntimeError(msg)
+            lam = lam.cloned_from
+        blocks.append(lam)
+
+        # TODO merge the data blocks together
+        df = DataFrame()
+        return df
 
     def query(self, assignments=None, filters=None, projections=None):
         if projections is None:
@@ -367,21 +387,32 @@ class PythonLambda(Lambda):
         pass
 
 
-def retrieve_type(namespace, name, version, session):
+def retrieve_type(namespaces, name, version, session):
     """
     Retrieving a Lambda
-    :type namespace: basestring
-    :type name: basestring
+    :type namespaces: List[str]
+    :type name: str
     :type version: int
     :type session: sqlalchemy.orm.Session
     :return: the Lambda or None
     """
-    if version:
-        lam = session.query(with_polymorphic(Lambda, '*'))\
-            .filter(Lambda.name == name, Lambda.version == version) \
-            .first()
-    else:
-        lam = session.query(with_polymorphic(Lambda, '*')) \
-            .filter(Lambda.name == name) \
-            .first()
+    #  find the latest versions
+    queries = [Lambda.namespace.in_(namespaces),
+               Lambda.name == name,
+               Lambda.status == Status.READY]
+    if version is not None:
+        queries.append(Lambda.version <= version)
+    lams = session.query(with_polymorphic(Lambda, '*')) \
+                  .filter(*queries) \
+                  .order_by(desc(Lambda.version)) \
+                  .all()
+    if len(lams) == 0:
+        return None
+
+    lam = lams[0]  # type: Lambda
+    if version is not None and lam.version < version:
+        msg = 'The specified version {} does not exist for {}.{}'.format(version, lam.namespace, lam.name)
+        raise RuntimeError(msg)
+
+    assert(lam is None or isinstance(lam, Lambda))
     return lam
