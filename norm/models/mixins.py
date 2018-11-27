@@ -1,12 +1,7 @@
-import json
-
-from sqlalchemy import (
-    Column, Integer, String, Text, func,
-    UniqueConstraint, ForeignKey)
-from sqlalchemy.orm import make_transient
-
 import norm.config as config
+from sqlalchemy import Column, Integer, String, Text
 
+import json
 import logging
 import traceback
 logger = logging.getLogger(__name__)
@@ -20,61 +15,27 @@ class Version(config.Model):
     __tablename__ = 'versions'
 
     id = Column(Integer, primary_key=True)
-    namespace = Column(String(1024), default='')
+    namespace = Column(String(512), default='')
     name = Column(String(256), nullable=False)
     max_ver = Column(Integer, default=0)
 
 
-class VersionedMixin(object):
+def new_version(namespace, name):
     """
-    Mixin to versioned objects
+    Make a new version for a namespaced name
+    :type namespace: str
+    :type name: str
+    :return: the version
+    :rtype: Column
     """
-    __versioned__ = True
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    namespace = Column(String(1024), default='')
-    name = Column(String(256), nullable=False)
-    version = Column(Integer, default=1, nullable=False)
-
-    def __init__(self, namespace='', name=''):
-        self.id = None
-        self.namspace = namespace
-        self.name = name
-        self.version = self.new_version()
-
-    def __repr__(self):
-        return str(self)
-
-    def __str__(self):
-        return self.fully_qualified_name
-
-    @property
-    def fully_qualified_name(self):
-        if self.namespace:
-            return '@'.join((self.namespace + '.' + self.name, str(self.version)))
-        else:
-            return '@'.join((self.name, str(self.version)))
-
-    def new_version(self):
-        """
-        Create a new version for this object
-        """
-        from superset import db
-        ver = db.session.query(Version).filter(Version.namespace == self.namespace,
-                                               Version.name == self.name).first()
-        if ver is None:
-            ver = Version(namespace=self.namespace, name=self.name)
-            db.session.add(ver)
+    ver = config.db.session.query(Version).filter(Version.namespace == namespace,
+                                                  Version.name == name).first()
+    if ver is None:
+        ver = Version(namespace=namespace, name=name, max_ver=1)
+        config.db.session.add(ver)
+    else:
         ver.max_ver = Version.max_ver + 1
-        return ver.max_ver
-
-    def clone(self):
-        # TODO: clone a new versioned self
-        pass
-
-    def merge(self, others):
-        # TODO: merge others into self and create a new version
-        pass
+    return ver.max_ver
 
 
 def lazy_property(f):

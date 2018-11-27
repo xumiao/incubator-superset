@@ -3,12 +3,11 @@ from sqlalchemy import desc, or_
 
 from norm.executable import NormExecutable, NormError
 from norm.models.natives import ListLambda
-from norm.models.norm import Lambda, lambda_user, lambda_variable, Variable
+from norm.models.norm import Lambda, Variable, Status
 
 
 class TypeName(NormExecutable):
 
-    DEFAULT_VERSION = 1
     DEFAULT_NAMESPACE = ''
 
     def __init__(self, name, version=None):
@@ -25,7 +24,7 @@ class TypeName(NormExecutable):
         self.version = version
 
     def __str__(self):
-        return self.name + '@' + str(self.version)
+        return self.name + '@' + str(self.version or 'latest')
 
     def execute(self, session, user, context):
         """
@@ -40,26 +39,24 @@ class TypeName(NormExecutable):
 
         if self.version is None:
             #  find the latest version
-            lam = session.query(with_polymorphic(Lambda, '*'), lambda_user) \
-                         .outerjoin(lambda_user) \
+            lam = session.query(with_polymorphic(Lambda, '*')) \
                          .filter(Lambda.namespace.in_(namespaces),
                                  Lambda.name == self.name,
-                                 or_(lambda_user.c.user_id == None,
-                                     lambda_user.c.user_id == user.id)) \
+                                 Lambda.status == Status.READY) \
                          .order_by(desc(Lambda.version)).scalar()
         else:
             lam = session.query(with_polymorphic(Lambda, '*')) \
                 .filter(Lambda.namespace.in_(namespaces),
                         Lambda.name == self.name,
+                        Lambda.status == Status.READY,
                         Lambda.version == self.version)\
                 .scalar()
+        # TODO: Check permissions for the user
 
         if lam is None:
             #  create a new Lambda
-            # TODO: namespace should be default to user
             namespace = self.namespace or self.DEFAULT_NAMESPACE
-            version = self.version or self.DEFAULT_VERSION
-            lam = Lambda(namespace=namespace, name=self.name, version=version, user=user)
+            lam = Lambda(namespace=namespace, name=self.name)
 
         assert(isinstance(lam, Lambda))
         return lam
