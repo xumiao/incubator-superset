@@ -24,7 +24,7 @@ class ArgumentExpr(NormExecutable):
     def set_positional(self, var):
         self.positional_variable = var
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         assignment = None
         condition = None
         projection = None
@@ -37,7 +37,7 @@ class ArgumentExpr(NormExecutable):
             else:
                 self.variable = self.positional_variable
         if isinstance(self.expr, ArithmeticExpr):
-            assignment = (self.variable.name, self.expr.execute(session, user, context))
+            assignment = (self.variable.name, self.expr.execute(session, context))
         if self.projection is not None:
             projection = (self.variable.name, self.projection.variable_name.name)
         return assignment, condition, projection

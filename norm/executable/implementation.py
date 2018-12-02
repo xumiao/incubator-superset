@@ -22,7 +22,7 @@ class TypeImplementation(NormExecutable):
         self.query = query
         self.description = description
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         # TODO: implement
         pass
 

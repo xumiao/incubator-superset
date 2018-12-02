@@ -23,13 +23,13 @@ class QueryExpr(NormExecutable):
         self.expr2 = expr2
         self.projection = projection
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         df = None
         if self.op is None:
             self.expr1.projection = self.projection
-            df = self.expr1.execute(session, user, context)
+            df = self.expr1.execute(session, context)
         elif self.op == LOP.AND:
-            df = self.expr1.execute(session, user, context)
+            df = self.expr1.execute(session, context)
             if not df.empty:
                 pass
             if isinstance(self.expr2, EvaluationExpr):

@@ -20,8 +20,8 @@ class EvaluationExpr(NormExecutable):
         self.args = args
         self._projection = None
 
-    def execute(self, session, user, context):
-        lam = self.type_name.execute(session, user, context)
+    def execute(self, session, context):
+        lam = self.type_name.execute(session, context)
         if lam is None:
             raise RuntimeError('Given type {} is not found'.format(self.type_name))
         nargs = lam.nargs
@@ -32,7 +32,7 @@ class EvaluationExpr(NormExecutable):
         conditions = []
         for i, arg in enumerate(reversed(self.args)):  # type: ArgumentExpr
             arg.set_positional(lam.variables[i])
-            assignment, condition, projection = arg.execute(session, user, context)
+            assignment, condition, projection = arg.execute(session, context)
             assignments.append(assignment)
             conditions.append(condition)
             projections.append(projection)
@@ -56,8 +56,8 @@ class ChainedEvaluationExpr(NormExecutable):
         self.rexpr = rexpr
         self._projection = None
 
-    def execute(self, session, user, context):
-        df = self.lexpr.execute(session, user, context)
+    def execute(self, session, context):
+        df = self.lexpr.execute(session, context)
 
         # TODO: Specialized to aggregations
         if isinstance(self.rexpr, EvaluationExpr):

@@ -16,6 +16,6 @@ class CodeExpr(NormExecutable):
         self.code = code
         self._projection = None
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         pass
 

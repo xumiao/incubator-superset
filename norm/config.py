@@ -1,3 +1,5 @@
+# Default namespace stub
+DEFAULT_NAMESPACE_STUB = 'norm.tmp'
 
 # Resource control
 MAX_LIMIT = 1000000

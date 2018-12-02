@@ -58,12 +58,11 @@ class NormExecutable(object):
         """
         self._projection = value
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         """
         Execute the command with given session and user context
         :param session: the session the command is executed against
         :type session: sqlalchemy.orm.Session
-        :param user: the user model
         :param context: the context of the executable
         :type context: norm.engine.NormCompiler
         :return: pandas.DataFrame

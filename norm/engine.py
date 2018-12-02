@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
@@ -44,15 +45,18 @@ walker = ParseTreeWalker()
 class NormCompiler(normListener):
 
     def __init__(self, context_id):
+        # TODO: make sure the context can be save/load from cache
+        # context_id, namespaces should be able to be saved directly
+        # variable, stack and df should be reset
         self.context_id = context_id
-        self.namespaces = {'', 'norm.natives'}
+        self.context_namespace = '{}.{}'.format(config.DEFAULT_NAMESPACE_STUB, context_id)
+        self.search_namespaces = {'', 'norm.natives'}
         self.stack = []
         self.variables = {}
         self.df = None
 
-    def reset(self, variables=None):
-        if variables is not None and isinstance(variables, dict):
-            self.variables.update(variables)
+    def reset(self):
+        self.variables = {}
         self.stack = []
         self.df = None
 
@@ -85,11 +89,12 @@ class NormCompiler(normListener):
         if ctx.imports():
             # pass up
             pass
+        elif ctx.exports():
+            # pass up
+            pass
         elif ctx.typeDeclaration():
             type_declaration = self.stack.pop()
-            namespace = self.stack.pop() if ctx.namespace() else ''
             description = self.stack.pop() if ctx.comments() else ''
-            type_declaration.namespace = namespace
             type_declaration.description = description
             self.stack.append(type_declaration)
         elif ctx.queryExpression():
@@ -168,25 +173,25 @@ class NormCompiler(normListener):
             cmt = cmt.strip(spaces)[2:].strip(spaces)
         self.stack.append(cmt)
 
-    def exitNamespace(self, ctx:normParser.NamespaceContext):
-        text = ctx.getText()[9:].strip()
-        self.stack.append(text)
-
     def exitImports(self, ctx:normParser.ImportsContext):
         type_ = self.stack.pop() if ctx.typeName() else None
-        namespaces = [str(v) for v in ctx.VARNAME()]
-        if type_:
-            variable = None
-            if ctx.AS():
-                variable = namespaces.pop()
-            self.stack.append(ImportVariable('.'.join(namespaces), type_, variable))
-        else:
-            self.stack.append(ImportVariable('.'.join(namespaces)))
+        namespace = [str(v) for v in ctx.VARNAME()]
+        variable = namespace.pop() if ctx.AS() else None
+        self.stack.append(ImportVariable('.'.join(namespace), type_, variable))
+
+    def exitExports(self, ctx:normParser.ExportsContext):
+        type_ = self.stack.pop()
+        namespace = [str(v) for v in ctx.VARNAME()]
+        variable = namespace.pop() if ctx.AS() else None
+        self.stack.append(ExportVariable('.'.join(namespace), type_, variable))
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
-        type_name = self.stack.pop()
-        variable_name = self.stack.pop()
-        self.stack.append(ArgumentDeclaration(variable_name, type_name))
+        if ctx.OMMIT():
+            self.stack.append(ArgumentDeclaration(OMMIT, None))
+        else:
+            type_name = self.stack.pop()
+            variable_name = self.stack.pop()
+            self.stack.append(ArgumentDeclaration(variable_name, type_name))
 
     def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):
         args = reversed([self.stack.pop() for ch in ctx.children
@@ -318,10 +323,16 @@ def get_compiler(context_id):
     return NormCompiler(context_id)
 
 
-def execute(script, session, user, context_id=None):
+def get_context(context_id):
+    return get_compiler(context_id)
+
+
+def execute(script, session, context_id=None):
+    if context_id is None:
+        context_id = str(uuid.uuid4())
     compiler = get_compiler(context_id)
     exe = compiler.compile(dedent(script))
     if isinstance(exe, NormExecutable):
-        return exe.execute(session, user, compiler)
+        return exe.execute(session, compiler)
     else:
         return exe

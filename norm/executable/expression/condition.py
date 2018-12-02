@@ -19,6 +19,6 @@ class ConditionExpr(NormExecutable):
         self.rexpr = rexpr
         self._projection = None
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         # TODO filtering the df by the condition
         pass

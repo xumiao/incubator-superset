@@ -19,8 +19,8 @@ class SliceExpr(NormExecutable):
         self.end = end
         self._projection = None
 
-    def execute(self, session, user, context):
-        df = self.expr.execute(session, user, context)
+    def execute(self, session, context):
+        df = self.expr.execute(session, context)
         df = df.iloc[self.start:self.end]
         # TODO reset the index for the projected variable
         return df

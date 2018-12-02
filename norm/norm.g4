@@ -7,7 +7,8 @@ script
 statement
     : comments SEMICOLON
     | comments? imports WSS? SEMICOLON
-    | comments? namespace? WSS? typeDeclaration WSS? SEMICOLON
+    | comments? exports WSS? SEMICOLON
+    | comments? WSS? typeDeclaration WSS? SEMICOLON
     | comments? typeName (WSS? '=' WSS? | WSS? OR '=' WSS? | WSS? AND '=' WSS?) queryExpression WSS? SEMICOLON
     | comments? queryExpression WSS? SEMICOLON
     ;
@@ -17,15 +18,20 @@ MULTILINE: '/*' (.)*? '*/' [\r\n]*;
 
 comments: MULTILINE | SINGLELINE;
 
-namespace: SPACED_NAMESPACE VARNAME (DOT VARNAME)*;
+exports: SPACED_EXPORT typeName WSS? VARNAME (DOT VARNAME)* (WSS? AS WSS? VARNAME)?;
 
-SPACED_NAMESPACE: 'namespace' [ \t]*;
+SPACED_EXPORT: 'export' [ \t]*;
 
-imports: SPACED_IMPORT VARNAME (DOT VARNAME)* (DOT typeName)? (WSS? AS WSS? VARNAME)?;
+imports
+    : SPACED_IMPORT VARNAME (DOT VARNAME)* DOT '*'
+    | SPACED_IMPORT VARNAME (DOT VARNAME)* DOT typeName (WSS? AS WSS? VARNAME)?
+    ;
 
-SPACED_IMPORT: 'using' [ \t]*;
+SPACED_IMPORT: 'import' [ \t]*;
 
-argumentDeclaration: variableName WSS? COLON WSS? typeName;
+argumentDeclaration
+    : OMMIT
+    | variableName WSS? COLON WSS? typeName;
 
 argumentDeclarations: argumentDeclaration (WSS? COMMA WSS? argumentDeclaration)*;
 
@@ -174,7 +180,7 @@ TIMES:     '*';
 XOR:       '^';
 IMP:       '=>';
 EQV:       '<=>';
-OMMIT:     '..';
+OMMIT:     '...';
 
 BOOLEAN:    'true' | 'false';
 INTEGER:    [+-]? DIGIT+;

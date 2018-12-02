@@ -27,7 +27,7 @@ class ArithmeticExpr(NormExecutable):
         self.expr2 = expr2
         self._projection = None
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         # TODO
         if self.constant:
             try:

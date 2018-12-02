@@ -153,7 +153,7 @@ class Lambda(Model, ParametrizedMixin):
     # version
     anchor = Column(Boolean, default=True)
     cloned_from_id = Column(Integer, ForeignKey('lambdas.id'))
-    cloned_from = relationship('Lambda')
+    cloned_from = relationship('Lambda', remote_side=[id])
     merged_from_ids = Column(ARRAY(Integer))
     version = Column(Integer, default=default_version, nullable=False)
     # revision
@@ -172,8 +172,6 @@ class Lambda(Model, ParametrizedMixin):
         self.id = None
         self.namespace = namespace
         self.name = name
-        self.cloned_from_id = None
-        self.merged_from_ids = []
         self.version = None
         self.description = description
         self.params = params
@@ -237,9 +235,11 @@ class Lambda(Model, ParametrizedMixin):
         """
         pass
 
-    def save(self):
+    def save(self, overwrite=False):
         """
         Save the current version and make it ready
+        :param overwrite: whether to overwrite the existing object
+        :type overwrite: Boolean
         :return:
         """
         pass
@@ -340,11 +340,6 @@ class KerasLambda(Lambda):
         'polymorphic_identity': 'lambda_keras'
     }
 
-    def __init__(self, namespace='', name='', version=None, description='', params='', code='',
-                 variables=None, user=None):
-        super().__init__(namespace=namespace, name=name, version=version, description=description, params=params,
-                         code=code, variables=variables, user=user)
-
     @lazy_property
     def keras_model(self):
         return None
@@ -362,11 +357,6 @@ class PythonLambda(Lambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_python'
     }
-
-    def __init__(self, namespace='', name='', version=None, description='', params='', code='',
-                 variables=None, user=None):
-        super().__init__(namespace=namespace, name=name, version=version, description=description, params=params,
-                         code=code, variables=variables, user=user)
 
     @lazy_property
     def apply_func(self):
@@ -387,20 +377,26 @@ class PythonLambda(Lambda):
         pass
 
 
-def retrieve_type(namespaces, name, version, session):
+def retrieve_type(namespaces, name, version, session, status=None):
     """
     Retrieving a Lambda
-    :type namespaces: List[str]
+    :type namespaces: str, List[str] or None
     :type name: str
-    :type version: int
+    :type version: int or None
     :type session: sqlalchemy.orm.Session
+    :type status: Status or None
     :return: the Lambda or None
     """
     #  find the latest versions
-    queries = [Lambda.namespace.in_(namespaces),
-               Lambda.name == name,
-               Lambda.status == Status.READY]
-    if version is not None:
+    queries = [Lambda.name == name]
+    if status is not None and isinstance(status, Status):
+        queries.append(Lambda.status == status)
+    if namespaces is not None:
+        if isinstance(namespaces, str):
+            queries.append(Lambda.namespace == namespaces)
+        else:
+            queries.append(Lambda.namespace.in_(namespaces))
+    if version is not None and isinstance(version, int):
         queries.append(Lambda.version <= version)
     lams = session.query(with_polymorphic(Lambda, '*')) \
                   .filter(*queries) \

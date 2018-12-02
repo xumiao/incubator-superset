@@ -21,7 +21,7 @@ class CommentsTestCase(unittest.TestCase):
         // Comment 1
         ;
         """
-        res = execute(script, self.session, self.user)
+        res = execute(script, self.session)
         self.assertEqual(res, 'Comment 1')
 
     def test_recognize_single_line_comment2(self):
@@ -29,7 +29,7 @@ class CommentsTestCase(unittest.TestCase):
         // \tComment 2
         ;
         """
-        res = execute(script, self.session, self.user)
+        res = execute(script, self.session)
         self.assertEqual(res, 'Comment 2')
 
     def test_fail_single_line_comment1(self):
@@ -39,14 +39,14 @@ class CommentsTestCase(unittest.TestCase):
         ;
         """
         with self.assertRaises(ValueError):
-            execute(script, self.session, self.user)
+            execute(script, self.session)
 
     def test_recognize_multi_line_comment1(self):
         script = """
         /* Comment 4 */
         ;
         """
-        res = execute(script, self.session, self.user)
+        res = execute(script, self.session)
         self.assertEqual(res, 'Comment 4')
 
     def test_recognize_multi_line_comment2(self):
@@ -56,7 +56,7 @@ class CommentsTestCase(unittest.TestCase):
         */
         ;
         """
-        res = execute(script, self.session, self.user)
+        res = execute(script, self.session)
         self.assertEqual(res, "Comment 5")
 
     def test_recognize_multi_line_comment3(self):
@@ -68,7 +68,7 @@ class CommentsTestCase(unittest.TestCase):
         */
         ;
         """
-        res = execute(script, self.session, self.user)
+        res = execute(script, self.session)
         self.assertEqual(res, "Comment 6\n    and\n    more ...")
 
     def test_fail_multi_line_comment4(self):
@@ -78,5 +78,5 @@ class CommentsTestCase(unittest.TestCase):
             no end
         """
         with self.assertRaises(ValueError):
-            execute(script, self.session, self.user)
+            execute(script, self.session)
 

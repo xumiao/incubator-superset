@@ -1,5 +1,8 @@
 import superset
 from norm.config import db, user_model
+from norm.models.utils import set_current_user
+
+__all__ = ['superset', 'user_tester']
 
 
 def user_tester():
@@ -10,4 +13,7 @@ def user_tester():
                             email='norm-tester@reasoned.ai', password='')
         db.session.add(tester)
         db.session.commit()
+
+    # TODO: figuring out how to set flask for unittests
+    set_current_user(tester)
     return tester

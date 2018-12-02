@@ -1,6 +1,18 @@
 // Declare lambdas
-namespace norm.test
 test(a:String, b:Int);
+
+// Export lambdas
+export test@3 norm.test;
+
+// Import lambdas
+import norm.test.test@4 as tt;
+
+// Add another attribute
+test(..., t:Datetime);
+
+// Add another attribute implicitly with values
+import time.now;
+test &= now()?t2; // automatically adding t2 as a Datetime type (inferred by the now output type)
 
 // Adding some data
 test = 'sfs' & 4
@@ -20,13 +32,6 @@ test(a~'s', b>3?);
 // Define the probability distribution
 test &= gaussian(mu=2, gamma=0.1, b)?prob;
 
-// Add another attribute
-test(..., t:Datetime);
-
-// Add another attribute and values
-using time.now
-test &= now()?t2; // automatically adding t2 as a Datetime type (inferred by the now output type)
-
 // Sort on an attribute
 test.sort(by=t, ascending=False);
 
@@ -38,7 +43,6 @@ test(a?) & extract(a, r'sf')?sf;
 
 // Extract a pattern on multiple attributes
 test(a?) & extract(a, r'sf{\W+}{[0-9]+}')?(v1, v2);
-
 
 // Access a nested attribute
 test(..., p:person);

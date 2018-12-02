@@ -35,12 +35,12 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#namespace.
-    def enterNamespace(self, ctx:normParser.NamespaceContext):
+    # Enter a parse tree produced by normParser#exports.
+    def enterExports(self, ctx:normParser.ExportsContext):
         pass
 
-    # Exit a parse tree produced by normParser#namespace.
-    def exitNamespace(self, ctx:normParser.NamespaceContext):
+    # Exit a parse tree produced by normParser#exports.
+    def exitExports(self, ctx:normParser.ExportsContext):
         pass
 
 

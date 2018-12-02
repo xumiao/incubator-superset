@@ -1,14 +1,9 @@
-from sqlalchemy.orm import with_polymorphic
-from sqlalchemy import desc, or_
-
 from norm.executable import NormExecutable, NormError
 from norm.models.natives import ListLambda
-from norm.models.norm import Lambda, Variable, Status, retrieve_type
+from norm.models.norm import Lambda, Variable, retrieve_type, Status
 
 
 class TypeName(NormExecutable):
-
-    DEFAULT_NAMESPACE = ''
 
     def __init__(self, name, version=None):
         """
@@ -22,46 +17,34 @@ class TypeName(NormExecutable):
         self.namespace = None
         self.name = name
         self.version = version
+        assert(self.name is not None)
+        assert(self.name != '')
 
     def __str__(self):
-        return self.name + '@' + str(self.version or 'latest')
+        s = self.namespace if self.namespace else ''
+        s += '.' + self.name
+        s += '@' + str(self.version) if self.version is not None else ''
+        return s
 
-    def execute(self, session, user, context):
+    def execute(self, session, context, to_create=False):
         """
         Retrieve the Lambda function by namespace, name, version.
         Note that user is encoded by the version.
         :rtype: Lambda
         """
-        if self.namespace is not None:
-            namespaces = [self.namespace]
+        if self.namespace is None:
+            lam = retrieve_type(context.context_namespace, self.name, self.version, session)
+            if lam is None:
+                lam = retrieve_type(context.search_namespaces, self.name, self.version, session, Status.READY)
         else:
-            namespaces = context.namespaces
-        lam = retrieve_type(namespaces, self.name, self.version, session)
-        if lam is None:
+            lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
+
+        if lam is None and to_create:
             #  create a new Lambda
-            lam = Lambda(namespace=self.namespace or self.DEFAULT_NAMESPACE,
+            lam = Lambda(namespace=self.namespace or context.context_namespace,
                          name=self.name)
+            session.add(lam)
         return lam
-
-"""
-        if self.version is None:
-            #  find the latest version
-            lam = session.query(with_polymorphic(Lambda, '*')) \
-                         .filter(Lambda.namespace.in_(namespaces),
-                                 Lambda.name == self.name,
-                                 Lambda.status == Status.READY) \
-                         .order_by(desc(Lambda.version))\
-                         .scalar()
-        else:
-            lam = session.query(with_polymorphic(Lambda, '*')) \
-                         .filter(Lambda.namespace.in_(namespaces),
-                                 Lambda.name == self.name,
-                                 Lambda.status == Status.READY,
-                                 Lambda.version == self.version)\
-                         .scalar()
-        # TODO: Check permissions for the user
-"""
-
 
 
 class ListType(NormExecutable):
@@ -75,20 +58,20 @@ class ListType(NormExecutable):
         super().__init__()
         self.intern = intern
 
-    def execute(self, session, user, context):
+    def execute(self, session, context):
         """
         Return a list type
         :rtype: ListLambda
         """
-        lam = self.intern.execute(session, user, context)
+        lam = self.intern.execute(session, context)
         if lam.id is None:
             raise NormError("{} does not seem to be declared yet".format(self.intern))
 
-        q = session.query(ListLambda, Variable).join(ListLambda.variables)\
-            .filter(Variable.type_id == lam.id)
-        llam = q.scalar()
+        llam = session.query(ListLambda, Variable).join(ListLambda.variables)\
+                      .filter(Variable.type_id == lam.id)\
+                      .scalar()
         if llam is None:
             # create a new ListLambda
             llam = ListLambda(lam)
-
+            session.add(llam)
         return llam
