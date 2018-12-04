@@ -9,7 +9,7 @@ from norm.models.norm import Status
 logger = logging.getLogger(__name__)
 
 
-class ImportVariable(NormExecutable):
+class Import(NormExecutable):
 
     def __init__(self, namespace=None, type_=None, variable=None):
         """
@@ -52,21 +52,19 @@ class ImportVariable(NormExecutable):
         return self.namespace
 
 
-class ExportVariable(NormExecutable):
+class Export(NormExecutable):
 
     def __init__(self, namespace=None, type_=None, alias=None):
         """
         Export the type to the namespace
         :param namespace: the namespace
-        :type namespace: str
+        :type namespace: str or None
         :param type_: the type
         :type type_: TypeName
         :param alias: the alias in the namespace
-        :type alias: str
+        :type alias: str or None
         """
         super().__init__()
-        assert(namespace is not None)
-        assert(namespace != '')
         assert(type_ is not None)
         self.namespace = namespace
         self.type_ = type_
@@ -77,9 +75,24 @@ class ExportVariable(NormExecutable):
         if lam is None:
             msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.type_.namespace)
             raise NormError(msg)
-        lam.namespace = self.namespace
+        if self.namespace is None or self.namespace.strip() == '':
+            if lam.cloned_from:
+                lam.namespace = lam.cloned_from.namespace
+            else:
+                lam.namespace = context.user_namespace
+        else:
+            lam.namespace = self.namespace
+        old_lam_name = lam.name
         if self.alias:
             lam.name = self.alias
+        # TODO: version has to be set here instead of at the commitment time. need to verify.
         lam.version = new_version(lam.namespace, lam.name)
         lam.status = Status.READY
+
+        # clone this one back to the current context for further modification
+        new_lam = lam.clone()
+        new_lam.namespace = context.context_namespace
+        new_lam.name = old_lam_name
+        session.add(new_lam)
+        # TODO: possible cascaded exporting. the clone_from object might need to be exported too, or merge into one.
         return lam

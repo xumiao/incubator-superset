@@ -31,16 +31,18 @@ def new_version(namespace, name):
     in_store = config.db.session.query(exists().where(and_(Version.namespace == namespace,
                                                       Version.name == name))).scalar()
     if not in_store:
-        ver = Version(namespace=namespace, name=name, max_ver=1)
-        config.db.session.add(ver)
-        return ver.max_ver
+        ver = config.db.engine.execute("""
+        INSERT INTO versions (namespace, name, max_ver) VALUES ('{}', '{}', 1)
+        RETURNING max_ver;
+        """.format(namespace, name)).fetchone()[0]
     else:
         ver = config.db.engine.execute("""
         UPDATE versions SET max_ver = max_ver + 1
         WHERE namespace = '{}' AND name = '{}'
         RETURNING max_ver;
         """.format(namespace, name)).fetchone()[0]
-        return ver
+
+    return ver
 
 
 def lazy_property(f):

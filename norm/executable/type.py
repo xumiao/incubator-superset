@@ -37,7 +37,10 @@ class TypeName(NormExecutable):
             if lam is None:
                 lam = retrieve_type(context.search_namespaces, self.name, self.version, session, Status.READY)
         else:
-            lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
+            if self.namespace == context.context_namespace:
+                lam = retrieve_type(self.namespace, self.name, self.version, session)
+            else:
+                lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
 
         if lam is None and to_create:
             #  create a new Lambda

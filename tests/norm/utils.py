@@ -1,6 +1,6 @@
 import superset
 from norm.config import db, user_model
-from norm.models.utils import set_current_user
+from norm.utils import set_current_user
 
 __all__ = ['superset', 'user_tester']
 

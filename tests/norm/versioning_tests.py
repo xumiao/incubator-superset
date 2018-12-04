@@ -5,11 +5,10 @@ from __future__ import print_function
 from __future__ import unicode_literals
 
 import unittest
-import uuid
 
 from tests.norm.utils import user_tester
 from norm.config import db
-from norm.engine import execute, get_compiler
+from norm.engine import execute
 
 
 class VersioningTestCase(unittest.TestCase):
@@ -17,29 +16,26 @@ class VersioningTestCase(unittest.TestCase):
     def setUp(self):
         self.session = db.session
         self.user = user_tester()
-        self.context_id = str(uuid.uuid4())
-        execute("version_test(test:Integer)",
-                self.session, self.context_id)
+        self.context_id = 'testing'
+
+    def tearDown(self):
+        self.session.rollback()
+        self.session.close()
+
+    def test_same_version_for_draft(self):
+        lam = execute("version_test(test:Integer);", self.session, self.context_id)
+        script = """
+        // revising a draft has the same version
+        version_test(test:Integer, test2:String);
+        """
+        lam2 = execute(script, self.session, self.context_id)
+        self.assertTrue(lam2.version == lam.version)
 
     def test_version_up(self):
-        script = """
-        using norm.test;
-        """
-        exe = execute(script, self.session)
-        self.assertEqual(exe, 'norm.test')
+        execute("version_test(test:Integer);", self.session, self.context_id)
+        lam1 = execute("export version_test;", self.session, self.context_id)
+        execute("version_test(test:Integer, test2:String);", self.session, self.context_id)
+        lam2 = execute("export version_test;", self.session, self.context_id)
+        self.assertTrue(lam2.version > lam1.version)
+        self.assertTrue(lam2.cloned_from is lam1)
 
-    def test_recognize_importing_type(self):
-        script = """
-        using norm.test.tester@3;
-        """
-        exe = execute(script, self.session)
-        self.assertEqual(exe, 'norm.test')
-
-    def test_recognize_renaming(self):
-        script = """
-        using norm.test.tester@4 as tt;
-        """
-        exe = execute(script, self.session, 0)
-        self.assertEqual(exe, 'norm.test')
-        c = get_compiler(0)
-        self.assertTrue('tt' in c.variables)

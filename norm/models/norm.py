@@ -17,7 +17,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, with_polymorphic
 
 from norm.models.mixins import lazy_property, ParametrizedMixin, new_version
-from norm.models.utils import current_user
+from norm.utils import current_user
 import norm.config as config
 
 from pandas import DataFrame
@@ -168,7 +168,7 @@ class Lambda(Model, ParametrizedMixin):
 
     __table_args__ = tuple(UniqueConstraint('namespace', 'name', 'version', name='unique_lambda'))
 
-    def __init__(self, namespace='', name='', description='', params='', variables=None):
+    def __init__(self, namespace='', name='', description='', params='{}', variables=None):
         self.id = None
         self.namespace = namespace
         self.name = name
@@ -176,6 +176,8 @@ class Lambda(Model, ParametrizedMixin):
         self.description = description
         self.params = params
         self.owner = current_user()
+        self.status = Status.DRAFT
+        self.merged_from_ids = []
         if variables is None:
             self.variables = []
         else:
@@ -210,13 +212,11 @@ class Lambda(Model, ParametrizedMixin):
         lam.anchor = False
         return lam
 
-    def merge(self, others, strategy='or'):
+    def merge(self, others):
         """
         Clone itself and merge several other versions into the new version
         :param others: other versions
         :type others: List[Lambda]
-        :param strategy: the merge strategy, i.e., ['or', 'and'], defaults to 'or'.
-        :type strategy: str
         :return: the merged version
         :rtype: Lambda
         """
@@ -228,9 +228,51 @@ class Lambda(Model, ParametrizedMixin):
         # TODO: merge implementation
         return lam
 
-    def revise(self):
+    def conjunction(self):
         """
-        Add a revision to the current draft version
+        Revise with conjunction
+        :return:
+        """
+        pass
+
+    def disjunction(self):
+        """
+        Revise with disjunction
+        :return:
+        """
+        pass
+
+    def add(self, name, type_):
+        """
+        Add a new variable into the signature
+        :type name: str
+        :type type_: Lambda
+        :return:
+        """
+        pass
+
+    def delete(self, name):
+        """
+        Delete a variable from the signature
+        :type name: str
+        :return:
+        """
+        pass
+
+    def rename(self, old_name, new_name):
+        """
+        Change the variable name
+        :type old_name: str
+        :type new_name: str
+        :return:
+        """
+        pass
+
+    def astype(self, name, new_type):
+        """
+        Change the type of the variable
+        :type name: str
+        :type new_type: Lambda
         :return:
         """
         pass

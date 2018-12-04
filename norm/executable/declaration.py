@@ -1,7 +1,7 @@
 import pandas as pd
 
 from norm.executable import NormExecutable, NormError
-from norm.models.norm import Lambda
+from norm.models.norm import Lambda, Status
 
 
 class ArgumentDeclaration(NormExecutable):
@@ -71,6 +71,16 @@ class TypeDeclaration(NormExecutable):
                      reversed(self.argument_declarations)]
         self.type_name.namespace = context.context_namespace
         lam = self.type_name.execute(session, context, to_create=True)  # type: Lambda
-        lam.description = self.description
-        lam.variables = variables
-        return lam
+        if lam.status == Status.DRAFT:
+            # If the lambda is a draft, we revise directly
+            lam.description = self.description
+            lam.variables = variables
+            return lam
+        else:
+            # If the lambda is ready, we clone to the context first and revise.
+            new_lam = lam.clone()
+            new_lam.description = self.description
+            new_lam.variables = variables
+            new_lam.status = Status.DRAFT
+            new_lam.namespace = context.context_namespace
+            return new_lam

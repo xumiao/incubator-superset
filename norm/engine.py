@@ -20,6 +20,7 @@ from norm.executable.implementation import *
 from norm.executable.type import *
 from norm.executable.namespace import *
 from norm.literals import AOP, COP, LOP, ImplType, CodeMode, ConstantType, OMMIT
+from norm.utils import current_user
 from norm.normLexer import normLexer
 from norm.normListener import normListener
 from norm.normParser import normParser
@@ -49,8 +50,10 @@ class NormCompiler(normListener):
         # context_id, namespaces should be able to be saved directly
         # variable, stack and df should be reset
         self.context_id = context_id
-        self.context_namespace = '{}.{}'.format(config.DEFAULT_NAMESPACE_STUB, context_id)
-        self.search_namespaces = {'', 'norm.natives'}
+        self.user = current_user()
+        self.context_namespace = '{}.{}'.format(config.CONTEXT_NAMESPACE_STUB, context_id)
+        self.user_namespace = '{}.{}'.format(config.USER_NAMESPACE_STUB, self.user.username)
+        self.search_namespaces = {'', 'norm.natives', self.context_namespace, self.user_namespace}
         self.stack = []
         self.variables = {}
         self.df = None
@@ -177,13 +180,13 @@ class NormCompiler(normListener):
         type_ = self.stack.pop() if ctx.typeName() else None
         namespace = [str(v) for v in ctx.VARNAME()]
         variable = namespace.pop() if ctx.AS() else None
-        self.stack.append(ImportVariable('.'.join(namespace), type_, variable))
+        self.stack.append(Import('.'.join(namespace), type_, variable))
 
     def exitExports(self, ctx:normParser.ExportsContext):
         type_ = self.stack.pop()
         namespace = [str(v) for v in ctx.VARNAME()]
         variable = namespace.pop() if ctx.AS() else None
-        self.stack.append(ExportVariable('.'.join(namespace), type_, variable))
+        self.stack.append(Export('.'.join(namespace), type_, variable))
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
         if ctx.OMMIT():

@@ -18,7 +18,10 @@ MULTILINE: '/*' (.)*? '*/' [\r\n]*;
 
 comments: MULTILINE | SINGLELINE;
 
-exports: SPACED_EXPORT typeName WSS? VARNAME (DOT VARNAME)* (WSS? AS WSS? VARNAME)?;
+exports
+    : SPACED_EXPORT typeName
+    | SPACED_EXPORT typeName WSS? VARNAME (DOT VARNAME)* (WSS? AS WSS? VARNAME)?
+    ;
 
 SPACED_EXPORT: 'export' [ \t]*;
 

@@ -17,7 +17,7 @@ class NamespaceTestCase(unittest.TestCase):
     def setUp(self):
         self.session = db.session
         self.user = user_tester()
-        self.context_id = str(uuid.uuid4())
+        self.context_id = 'testing'
         execute("Tester(dummy:Integer);", self.session, self.context_id)
         execute("export Tester norm.test;", self.session, self.context_id)
         self.context_id = str(uuid.uuid4())
@@ -41,7 +41,7 @@ class NamespaceTestCase(unittest.TestCase):
         execute(script, self.session, self.context_id)
         context = get_context(self.context_id)
         self.assertTrue('norm.test' in context.search_namespaces)
-        lam = retrieve_type(context.context_namespace, 'Tester', 1, self.session)
+        lam = retrieve_type(context.context_namespace, 'Tester', None, self.session)
         self.assertTrue(lam is not None)
 
     def test_renaming(self):
@@ -51,12 +51,12 @@ class NamespaceTestCase(unittest.TestCase):
         execute(script, self.session, self.context_id)
         context = get_context(self.context_id)
         self.assertTrue('norm.test' in context.search_namespaces)
-        lam = retrieve_type(context.context_namespace, 'tt', 1, self.session)
+        lam = retrieve_type(context.context_namespace, 'tt', None, self.session)
         self.assertTrue(lam is not None)
 
     def test_exporting(self):
         context_id = str(uuid.uuid4())
         execute("Tester(dummy:Integer);", self.session, context_id)
         execute("export Tester norm.test2 as Tester2;", self.session, context_id)
-        lam = retrieve_type('norm.test2', 'Tester2', 1, self.session)
+        lam = retrieve_type('norm.test2', 'Tester2', None, self.session)
         self.assertTrue(lam is not None)
