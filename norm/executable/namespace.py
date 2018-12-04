@@ -49,7 +49,9 @@ class Import(NormExecutable):
                 alias.name = self.variable
             assert(alias.version is None)
             session.add(alias)
-        return self.namespace
+            return alias
+        else:
+            return self.namespace
 
 
 class Export(NormExecutable):

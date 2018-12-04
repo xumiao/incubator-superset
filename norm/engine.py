@@ -1,5 +1,4 @@
 import re
-import uuid
 
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
@@ -55,11 +54,11 @@ class NormCompiler(normListener):
         self.user_namespace = '{}.{}'.format(config.USER_NAMESPACE_STUB, self.user.username)
         self.search_namespaces = {'', 'norm.natives', self.context_namespace, self.user_namespace}
         self.stack = []
-        self.variables = {}
         self.df = None
+        self.session = None
 
-    def reset(self):
-        self.variables = {}
+    def set_session(self, session):
+        self.session = session
         self.stack = []
         self.df = None
 
@@ -87,6 +86,13 @@ class NormCompiler(normListener):
         walker.walk(self, tree)
         self.optimize()
         return self.stack.pop()
+
+    def execute(self, script):
+        exe = self.compile(dedent(script))
+        if isinstance(exe, NormExecutable):
+            return exe.execute(self.session, self)
+        else:
+            return exe
 
     def exitStatement(self, ctx:normParser.StatementContext):
         if ctx.imports():
@@ -326,16 +332,7 @@ def get_compiler(context_id):
     return NormCompiler(context_id)
 
 
-def get_context(context_id):
-    return get_compiler(context_id)
-
-
-def execute(script, session, context_id=None):
-    if context_id is None:
-        context_id = str(uuid.uuid4())
+def executor(context_id, session):
     compiler = get_compiler(context_id)
-    exe = compiler.compile(dedent(script))
-    if isinstance(exe, NormExecutable):
-        return exe.execute(session, compiler)
-    else:
-        return exe
+    compiler.set_session(session)
+    return compiler
