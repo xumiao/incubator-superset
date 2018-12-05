@@ -14,10 +14,7 @@ def current_user():
 
 
 def set_current_user(user):
-    try:
-        g.user = user
-    except Exception:
-        msg = 'Flask context does not allow setting the user, use unprotected context instead'
-        logger.warning(msg)
-        global _user
+    # TODO: figuring out how to set flask for testing
+    global _user
+    if _user is None:
         _user = user

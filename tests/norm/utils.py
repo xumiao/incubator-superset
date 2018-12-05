@@ -22,7 +22,6 @@ def user_tester():
         db.session.add(tester)
         db.session.commit()
 
-    # TODO: figuring out how to set flask for unittests
     set_current_user(tester)
     return tester
 
