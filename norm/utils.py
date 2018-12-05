@@ -16,5 +16,4 @@ def current_user():
 def set_current_user(user):
     # TODO: figuring out how to set flask for testing
     global _user
-    if _user is None:
-        _user = user
+    _user = user

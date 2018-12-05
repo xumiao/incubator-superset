@@ -10,10 +10,7 @@ from tests.norm.utils import NormTestCase
 class NamespaceTestCase(NormTestCase):
 
     def test_importing(self):
-        script = """
-        import norm.test.*;
-        """
-        self.execute(script)
+        self.execute("import norm.test.*;")
         self.assertTrue('norm.test' in self.executor.search_namespaces)
 
     def test_importing_type(self):
@@ -21,7 +18,6 @@ class NamespaceTestCase(NormTestCase):
         self.execute("export Tester norm.test;")
         lam = self.execute("import norm.test.Tester;")
         self.assertTrue('norm.test' in self.executor.search_namespaces)
-        # lam = retrieve_type(self.executor.context_namespace, 'Tester', None, self.session)
         self.assertTrue(lam is not None)
 
     def test_renaming(self):
@@ -39,3 +35,11 @@ class NamespaceTestCase(NormTestCase):
         self.assertTrue(lam is not None)
         self.assertTrue(lam.namespace == 'norm.test2')
         self.assertTrue(lam.name == 'Tester2')
+
+    def test_exporting_default(self):
+        self.execute("Tester(dummy:Integer);")
+        lam = self.execute("export Tester;")
+        self.assertTrue(lam is not None)
+        self.assertTrue(lam.namespace == self.executor.user_namespace)
+        self.assertTrue(lam.name == 'Tester')
+
