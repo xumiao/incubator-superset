@@ -1,5 +1,7 @@
+from sqlalchemy.dialects import postgresql
+
 from norm.executable import NormExecutable, NormError
-from norm.models.natives import ListLambda
+from norm.models.native import ListLambda
 from norm.models.norm import Lambda, Variable, retrieve_type, Status
 
 
@@ -70,9 +72,9 @@ class ListType(NormExecutable):
         if lam.id is None:
             raise NormError("{} does not seem to be declared yet".format(self.intern))
 
-        llam = session.query(ListLambda, Variable).join(ListLambda.variables)\
-                      .filter(Variable.type_id == lam.id)\
-                      .scalar()
+        q = session.query(ListLambda, Variable).join(ListLambda.variables)\
+                   .filter(Variable.type_id == lam.id)
+        llam = q.scalar()
         if llam is None:
             # create a new ListLambda
             llam = ListLambda(lam)

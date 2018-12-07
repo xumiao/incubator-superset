@@ -52,7 +52,8 @@ class NormCompiler(normListener):
         self.user = current_user()
         self.context_namespace = '{}.{}'.format(config.CONTEXT_NAMESPACE_STUB, context_id)
         self.user_namespace = '{}.{}'.format(config.USER_NAMESPACE_STUB, self.user.username)
-        self.search_namespaces = {'', 'norm.natives', self.context_namespace, self.user_namespace}
+        from norm.models.native import NativeLambda
+        self.search_namespaces = {NativeLambda.NAMESPACE, self.context_namespace, self.user_namespace}
         self.stack = []
         self.df = None
         self.session = None

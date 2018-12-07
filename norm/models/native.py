@@ -55,9 +55,10 @@ class NativeLambda(Lambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native'
     }
+    NAMESPACE = 'norm.native'
 
     def __init__(self, name, description, variables):
-        super().__init__(namespace='norm.natives',
+        super().__init__(namespace=self.NAMESPACE,
                          name=name,
                          description=description,
                          variables=variables)
