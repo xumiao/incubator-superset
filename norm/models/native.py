@@ -11,6 +11,8 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from norm.config import db
 from norm.models.norm import Lambda, Variable, Status
 
+import pandas as pd
+
 import logging
 import traceback
 logger = logging.getLogger(__name__)
@@ -57,19 +59,13 @@ class NativeLambda(Lambda):
     }
     NAMESPACE = 'norm.native'
 
-    def __init__(self, name, description, variables):
+    def __init__(self, name, description, variables, dtype='object'):
         super().__init__(namespace=self.NAMESPACE,
                          name=name,
                          description=description,
-                         variables=variables)
+                         variables=variables,
+                         dtype=dtype)
         self.status = Status.READY
-
-    def load_data(self):
-        """
-        Native lambdas do not have data
-        :return: None
-        """
-        return None
 
 
 @Register()
@@ -121,8 +117,22 @@ class BooleanLambda(NativeLambda):
 
     def __init__(self):
         super().__init__(name='Boolean',
-                         description='Boolean, true/false, 1/0',
-                         variables=[])
+                         description='Boolean, true/false',
+                         variables=[],
+                         dtype='bool')
+
+
+@Register()
+class FloatLambda(NativeLambda):
+    __mapper_args__ = {
+        'polymorphic_identity': 'lambda_native_float'
+    }
+
+    def __init__(self):
+        super().__init__(name='Float',
+                         description='Integer, -inf..+inf',
+                         variables=[],
+                         dtype='float')
 
 
 @Register()
@@ -134,7 +144,8 @@ class IntegerLambda(NativeLambda):
     def __init__(self):
         super().__init__(name='Integer',
                          description='Integer, -inf..+inf',
-                         variables=[])
+                         variables=[],
+                         dtype='int')
 
 
 @Register()
@@ -146,18 +157,6 @@ class StringLambda(NativeLambda):
     def __init__(self):
         super().__init__(name='String',
                          description='String, "blahbalh"',
-                         variables=[])
-
-
-@Register()
-class UnicodeLambda(NativeLambda):
-    __mapper_args__ = {
-        'polymorphic_identity': 'lambda_native_unicode'
-    }
-
-    def __init__(self):
-        super().__init__(name='Unicode',
-                         description='Unicode, u"blahblah"',
                          variables=[])
 
 
@@ -206,7 +205,8 @@ class DatetimeLambda(NativeLambda):
     def __init__(self):
         super().__init__(name='Datetime',
                          description='Datetime, t"2018-09-01"',
-                         variables=[])
+                         variables=[],
+                         dtype='datetime64[ns]')
 
 
 @Register(dtype='float32', shape=[300])
@@ -215,14 +215,13 @@ class TensorLambda(NativeLambda):
         'polymorphic_identity': 'lambda_native_tensor'
     }
 
-    dtype = Column(String(16), default='float32')
     shape = Column(ARRAY(Integer), default=[300])
 
     def __init__(self, dtype, shape):
         super().__init__(name='Tensor[{}]{}'.format(dtype, str(tuple(shape))),
                          description='Tensor, [2.2, 3.2]',
-                         variables=[])
-        self.dtype = dtype
+                         variables=[],
+                         dtype=dtype)
         assert(isinstance(shape, list) or isinstance(shape, tuple))
         assert(all([isinstance(element, int) for element in shape]))
         self.shape = list(shape)

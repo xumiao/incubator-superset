@@ -150,22 +150,28 @@ class Lambda(Model, ParametrizedMixin):
     category = Column(String(128))
 
     PARQUET_EXT = 'parq'
+
     COLUMN_OUTPUT = 'output'
     COLUMN_TOMBSTONE = 'tombstone'
-    COLUMN_TOMBSTONE_T = bool
+    COLUMN_TOMBSTONE_T = 'bool'
     COLUMN_PROB = 'prob'
-    COLUMN_PROB_T = float
+    COLUMN_PROB_T = 'float'
     COLUMN_LABEL = 'label'
-    COLUMN_LABEL_T = float
+    COLUMN_LABEL_T = 'float'
     COLUMN_OID = 'oid'
-    COLUMN_OID_T = str
+    COLUMN_OID_T = 'object'
     COLUMN_TIMESTAMP = 'timestamp'
-    COLUMN_TIMESTAMP_T = datetime  # TODO: compatibility with DataFrame timestamp
+    COLUMN_TIMESTAMP_T = 'datetime64[ns]'
+    COLUMN_TENSOR = 'tensor'
+    COLUMN_TENSOR_T = 'float32'
+    COLUMN_TENSOR_SHAPE = [100]
 
     # identifiers
     id = Column(Integer, primary_key=True, autoincrement=True)
     namespace = Column(String(512), default='')
     name = Column(String(256), nullable=False)
+    # data type
+    dtype = Column(String(16), default='object')
     # owner
     created_by_id = Column(Integer, ForeignKey(user_model.id))
     owner = relationship(user_model, backref='lambdas', foreign_keys=[created_by_id])
@@ -197,7 +203,7 @@ class Lambda(Model, ParametrizedMixin):
 
     __table_args__ = tuple(UniqueConstraint('namespace', 'name', 'version', name='unique_lambda'))
 
-    def __init__(self, namespace='', name='', description='', params='{}', variables=None):
+    def __init__(self, namespace='', name='', description='', params='{}', variables=None, dtype=None):
         self.id = None
         self.namespace = namespace
         self.name = name
@@ -211,6 +217,7 @@ class Lambda(Model, ParametrizedMixin):
         self.revisions = []
         self.current_revision = 0
         self.df = None
+        self.dtype = dtype
 
     @hybrid_property
     def nargs(self):
@@ -221,6 +228,10 @@ class Lambda(Model, ParametrizedMixin):
 
     def __str__(self):
         return self.signature
+
+    @property
+    def d_type(self):
+        return object
 
     @property
     def signature(self):
@@ -419,8 +430,9 @@ class Lambda(Model, ParametrizedMixin):
         :return: the data frame with columns
         :rtype: DataFrame
         """
-        return DataFrame(columns=[self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
-                                  self.COLUMN_TOMBSTONE] + [v.name for v in self.variables])
+        df = DataFrame(columns=[self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
+                                self.COLUMN_TOMBSTONE] + [v.name for v in self.variables])
+        return df.astype({})
 
     def load_data(self):
         """
