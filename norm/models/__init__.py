@@ -5,3 +5,4 @@ from norm.models.native import (NativeLambda, TypeLambda, AnyLambda, ListLambda,
                                 BooleanLambda, IntegerLambda, StringLambda,
                                 UnicodeLambda, PatternLambda, UUIDLambda,
                                 URLLambda, DatetimeLambda, TensorLambda)
+from norm.models.license import License

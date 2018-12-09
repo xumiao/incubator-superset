@@ -28,6 +28,7 @@ def new_version(namespace, name):
     :return: the version
     :rtype: Column
     """
+
     in_store = config.db.session.query(exists().where(and_(Version.namespace == namespace,
                                                       Version.name == name))).scalar()
     if not in_store:

@@ -96,7 +96,6 @@ class AnyLambda(NativeLambda):
                          variables=[])
 
 
-@Register(type_=Register.retrieve(AnyLambda))
 class ListLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_list'

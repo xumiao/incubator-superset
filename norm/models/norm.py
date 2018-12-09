@@ -4,6 +4,9 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import os
+import errno
+
 from datetime import datetime
 from textwrap import dedent
 import enum
@@ -17,6 +20,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, with_polymorphic
 
 from norm.models.mixins import lazy_property, ParametrizedMixin, new_version
+from norm.models.license import License
 from norm.utils import current_user
 import norm.config as config
 
@@ -58,9 +62,12 @@ class Variable(Model, ParametrizedMixin):
 
 
 class RevisionMode(enum.Enum):
-    NEW = 0
-    OR = 1
-    AND = 2
+    NEW = 0  # a new implementation that discards all previous changes if any
+    CON = 1  # a conjunction of logical revisions
+    DIS = 2  # a disjunction of logical revisions
+    DEL = 3  # a deletion of logical revisions
+    MOD = 4  # a modification of variables, e.g., renaming or changing types
+    FIT = 5  # a model update
 
 
 class Revision(Model, ParametrizedMixin):
@@ -79,7 +86,15 @@ class Revision(Model, ParametrizedMixin):
         :return: the revised Lambda
         :rtype: Lambda
         """
-        pass
+        raise NotImplementedError
+
+    def delta(self):
+        """
+        Delta data that can be re-applied on the data.
+        :return: the delta data
+        :rtype: DataFrame or None
+        """
+        raise NotImplementedError
 
     def redo(self, lam):
         """
@@ -89,7 +104,7 @@ class Revision(Model, ParametrizedMixin):
         :return: the revised Lambda
         :rtype: Lambda
         """
-        pass
+        raise NotImplementedError
 
     def undo(self, lam):
         """
@@ -99,7 +114,7 @@ class Revision(Model, ParametrizedMixin):
         :return: the reverted Lambda
         :rtype: Lambda
         """
-        pass
+        raise NotImplementedError
 
 
 lambda_revision = Table(
@@ -134,17 +149,27 @@ class Lambda(Model, ParametrizedMixin):
     __tablename__ = 'lambdas'
     category = Column(String(128))
 
-    OUTPUT_NAME = 'output'
+    PARQUET_EXT = 'parq'
+    COLUMN_OUTPUT = 'output'
+    COLUMN_TOMBSTONE = 'tombstone'
+    COLUMN_TOMBSTONE_T = bool
+    COLUMN_PROB = 'prob'
+    COLUMN_PROB_T = float
+    COLUMN_LABEL = 'label'
+    COLUMN_LABEL_T = float
+    COLUMN_OID = 'oid'
+    COLUMN_OID_T = str
+    COLUMN_TIMESTAMP = 'timestamp'
+    COLUMN_TIMESTAMP_T = datetime  # TODO: compatibility with DataFrame timestamp
 
     # identifiers
     id = Column(Integer, primary_key=True, autoincrement=True)
     namespace = Column(String(512), default='')
     name = Column(String(256), nullable=False)
-
     # owner
     created_by_id = Column(Integer, ForeignKey(user_model.id))
     owner = relationship(user_model, backref='lambdas', foreign_keys=[created_by_id])
-    # auditing
+    # audition
     created_on = Column(DateTime, default=datetime.now)
     changed_on = Column(DateTime, default=datetime.now, onupdate=datetime.now)
     # schema
@@ -160,6 +185,10 @@ class Lambda(Model, ParametrizedMixin):
     revisions = relationship(Revision, secondary=lambda_revision)
     current_revision = Column(Integer, default=0)
     status = Column(Enum(Status), default=Status.DRAFT)
+    # license
+    license_id = Column(Integer, ForeignKey(License.id))
+    license = relationship(License, foreign_keys=[license_id])
+    # price
 
     __mapper_args__ = {
         'polymorphic_identity': 'lambda',
@@ -178,10 +207,10 @@ class Lambda(Model, ParametrizedMixin):
         self.owner = current_user()
         self.status = Status.DRAFT
         self.merged_from_ids = []
-        if variables is None:
-            self.variables = []
-        else:
-            self.variables = variables
+        self.variables = variables or []
+        self.revisions = []
+        self.current_revision = 0
+        self.df = None
 
     @hybrid_property
     def nargs(self):
@@ -230,43 +259,43 @@ class Lambda(Model, ParametrizedMixin):
 
     def conjunction(self):
         """
-        Revise with conjunction
+        Revise with conjunction (AND)
         :return:
         """
-        pass
+        raise NotImplementedError
 
     def disjunction(self):
         """
-        Revise with disjunction
+        Revise with disjunction (OR)
         :return:
         """
-        pass
+        raise NotImplementedError
 
-    def add(self, name, type_):
+    def add_variable(self, name, type_):
         """
         Add a new variable into the signature
         :type name: str
         :type type_: Lambda
         :return:
         """
-        pass
+        raise NotImplementedError
 
-    def delete(self, name):
+    def delete_variable(self, name):
         """
         Delete a variable from the signature
         :type name: str
         :return:
         """
-        pass
+        raise NotImplementedError
 
-    def rename(self, old_name, new_name):
+    def rename_variable(self, old_name, new_name):
         """
         Change the variable name
         :type old_name: str
         :type new_name: str
         :return:
         """
-        pass
+        raise NotImplementedError
 
     def astype(self, name, new_type):
         """
@@ -275,7 +304,7 @@ class Lambda(Model, ParametrizedMixin):
         :type new_type: Lambda
         :return:
         """
-        pass
+        raise NotImplementedError
 
     def save(self, overwrite=False):
         """
@@ -284,39 +313,114 @@ class Lambda(Model, ParametrizedMixin):
         :type overwrite: Boolean
         :return:
         """
-        pass
+        raise NotImplementedError
 
     def compact(self):
         """
         Compact this version with previous versions to make it an anchor
         :return:
         """
-        pass
+        raise NotImplementedError
 
     def rollback(self):
         """
         Rollback to the previous revision if it is in draft status
-        :return:
         """
-        pass
+        if self.status != Status.DRAFT:
+            msg = '{} is not in Draft status. Please clone first to modify'.format(self)
+            raise RuntimeError(msg)
+
+        if 0 < self.current_revision < len(self.revisions):
+            revision = self.revisions[self.current_revision]
+            revision.undo(self)
+            self.current_revision -= 1
+        else:
+            if self.current_revision == 0:
+                msg = '{} has already rolled back to the beginning of the version.\n ' \
+                      'Might want to rollback the version'.format(self)
+                logger.warning(msg)
+            else:
+                msg = 'Current revision {} is higher than it has {}'.format(self.current_revision, len(self.revisions))
+                logger.error(msg)
+                raise RuntimeError(msg)
 
     def forward(self):
         """
         Forward to the next revision if it is in draft status
-        :return:
         """
-        pass
+        if self.status != Status.DRAFT:
+            msg = '{} is not in Draft status. Please clone first to modify'.format(self)
+            raise RuntimeError(msg)
+
+        if self.current_revision < len(self.revisions) - 1:
+            revision = self.revisions[self.current_revision + 1]
+            revision.redo(self)
+            self.current_revision += 1
+        else:
+            if self.current_revision == len(self.revisions) - 1:
+                msg = '{} is already at the latest revision.\n ' \
+                      'Might want to forward the version'.format(self)
+                logger.warning(msg)
+            else:
+                msg = 'Current revision {} is higher than it has {}'.format(self.current_revision, len(self.revisions))
+                logger.error(msg)
+                raise RuntimeError(msg)
 
     def __call__(self, *args, **kwargs):
         """
         TODO: implement
         """
-        pass
+        raise NotImplementedError
 
     @property
-    def data_file(self):
-        root = config.DATA_STORAGE_ROOT
-        return '{}/{}/{}.parquet'.format(root, self.namespace, self.name)
+    def folder(self):
+        return '{}/{}/{}'.format(config.DATA_STORAGE_ROOT,
+                                 self.namespace.replace('.', '/'),
+                                 self.name)
+
+    @property
+    def path(self):
+        return '{}/{}.{}'.format(self.folder, self.version, self.PARQUET_EXT)
+
+    @staticmethod
+    def _overwrite_with_delta(lam, df):
+        """
+        Overwrite the existing dataframe with the delta dataframe from the given Lambda, assuming it is the same Lambda
+        with different version.
+        :param lam: the delta data from the Lambda
+        :type lam: Lambda
+        :param df: the base DataFrame
+        :type df: DataFrame
+        :return: the modified DataFrame
+        :rtype: DataFrame
+        """
+        try:
+            delta = pd.read_parquet(lam.path)
+            df.loc[delta.index, delta.columns] = delta.values
+        except FileNotFoundError:
+            pass
+        return df
+
+    def create_folder(self):
+        """
+        Create the folder for the namespace.
+        """
+        # TODO: abstract the data storage folder creation
+        try:
+            # for the case of concurrent processing
+            os.makedirs(self.folder)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+    def empty_data(self):
+        """
+        Create an empty data frame
+        :return: the data frame with columns
+        :rtype: DataFrame
+        """
+        return DataFrame(columns=[self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
+                                  self.COLUMN_TOMBSTONE] + [v.name for v in self.variables])
 
     def load_data(self):
         """
@@ -324,21 +428,35 @@ class Lambda(Model, ParametrizedMixin):
         :return: the combined data
         :rtype: DataFrame
         """
-        blocks = []
         lam = self
+        blocks = [self]
         while not lam.anchor:
-            blocks.append(lam)
             if lam.cloned_from is None:
-                msg = 'Can not find the anchor version for {}.{} before the chain is broken\n' \
-                          .format(lam.namespace, lam.name) + \
-                      '{}'.format([l.version for l in blocks])
+                msg = 'The chain is broken, can not find the anchor version for {}.{}\n' \
+                    .format(lam.namespace, lam.name)
                 raise RuntimeError(msg)
             lam = lam.cloned_from
-        blocks.append(lam)
+            blocks.append(lam)
+        df = self.empty_data()
+        for lam in reversed(blocks):
+            df = self._overwrite_with_delta(lam, df)
+        # Choose the rows still alive
+        self.df = df[~df[self.COLUMN_TOMBSTONE]]
+        return self.df
 
-        # TODO merge the data blocks together
-        df = DataFrame()
-        return df
+    def save_data(self):
+        """
+        Save data as the delta. Each revision produces a small delta, the overall delta combines all revision deltas.
+        :return: the delta data
+        :rtype: DataFrame
+        """
+        df = self.empty_data()
+        for revision in self.revisions:
+            delta = revision.delta()
+            df.loc[delta.index, delta.columns] = delta.values
+        if not os.path.exists(self.folder):
+            self.create_folder()
+        df.to_parquet(self.path)
 
     def query(self, assignments=None, filters=None, projections=None):
         if projections is None:
