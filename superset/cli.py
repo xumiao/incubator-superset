@@ -39,6 +39,8 @@ def init_norm():
     """Inits the Norm models"""
     from norm.models.native import Register
     Register.register()
+    from norm.models.license import register_licenses
+    register_licenses()
 
 
 def debug_run(app, port, use_reloader):

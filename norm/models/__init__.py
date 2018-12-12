@@ -3,6 +3,6 @@ from norm.models.norm import (Variable, lambda_revision, lambda_variable, Revisi
                               KerasLambda, PythonLambda)
 from norm.models.native import (NativeLambda, TypeLambda, AnyLambda, ListLambda,
                                 BooleanLambda, IntegerLambda, StringLambda,
-                                UnicodeLambda, PatternLambda, UUIDLambda,
+                                PatternLambda, UUIDLambda, FloatLambda,
                                 URLLambda, DatetimeLambda, TensorLambda)
 from norm.models.license import License

@@ -26,6 +26,7 @@ import norm.config as config
 
 from pandas import DataFrame
 import pandas as pd
+import numpy as np
 
 import traceback
 import logging
@@ -152,19 +153,17 @@ class Lambda(Model, ParametrizedMixin):
     PARQUET_EXT = 'parq'
 
     COLUMN_OUTPUT = 'output'
-    COLUMN_TOMBSTONE = 'tombstone'
-    COLUMN_TOMBSTONE_T = 'bool'
-    COLUMN_PROB = 'prob'
-    COLUMN_PROB_T = 'float'
     COLUMN_LABEL = 'label'
     COLUMN_LABEL_T = 'float'
     COLUMN_OID = 'oid'
     COLUMN_OID_T = 'object'
+    COLUMN_PROB = 'prob'
+    COLUMN_PROB_T = 'float'
     COLUMN_TIMESTAMP = 'timestamp'
     COLUMN_TIMESTAMP_T = 'datetime64[ns]'
     COLUMN_TENSOR = 'tensor'
-    COLUMN_TENSOR_T = 'float32'
-    COLUMN_TENSOR_SHAPE = [100]
+    COLUMN_TOMBSTONE = 'tombstone'
+    COLUMN_TOMBSTONE_T = 'bool'
 
     # identifiers
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -172,6 +171,9 @@ class Lambda(Model, ParametrizedMixin):
     name = Column(String(256), nullable=False)
     # data type
     dtype = Column(String(16), default='object')
+    # tensor type and shape
+    ttype = Column(String(16), default='float32')
+    shape = Column(ARRAY(Integer), default=[100])
     # owner
     created_by_id = Column(Integer, ForeignKey(user_model.id))
     owner = relationship(user_model, backref='lambdas', foreign_keys=[created_by_id])
@@ -223,15 +225,15 @@ class Lambda(Model, ParametrizedMixin):
     def nargs(self):
         return len(self.variables)
 
+    @hybrid_property
+    def dim(self):
+        return len(self.shape)
+
     def __repr__(self):
         return str(self)
 
     def __str__(self):
         return self.signature
-
-    @property
-    def d_type(self):
-        return object
 
     @property
     def signature(self):
@@ -268,6 +270,29 @@ class Lambda(Model, ParametrizedMixin):
         # TODO: merge implementation
         return lam
 
+    def compact(self):
+        """
+        Compact this version with previous versions to make an anchor version
+        :return:
+        """
+        raise NotImplementedError
+
+    def _check_draft_status(func):
+        """
+        A decorator to check whether the current Lambda is in draft status
+        :param func: a function to wrap
+        :type func: Callable
+        :return: a wrapped function
+        :rtype: Callable
+        """
+        def wrapper(self, *args, **kwargs):
+            if self.status != Status.DRAFT:
+                msg = '{} is not in Draft status. Please clone first to modify'.format(self)
+                raise RuntimeError(msg)
+            return func(self, *args, **kwargs)
+        return wrapper
+
+    @_check_draft_status
     def conjunction(self):
         """
         Revise with conjunction (AND)
@@ -275,6 +300,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
+    @_check_draft_status
     def disjunction(self):
         """
         Revise with disjunction (OR)
@@ -282,6 +308,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
+    @_check_draft_status
     def add_variable(self, name, type_):
         """
         Add a new variable into the signature
@@ -291,6 +318,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
+    @_check_draft_status
     def delete_variable(self, name):
         """
         Delete a variable from the signature
@@ -299,6 +327,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
+    @_check_draft_status
     def rename_variable(self, old_name, new_name):
         """
         Change the variable name
@@ -308,6 +337,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
+    @_check_draft_status
     def astype(self, name, new_type):
         """
         Change the type of the variable
@@ -317,6 +347,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
+    @_check_draft_status
     def save(self, overwrite=False):
         """
         Save the current version and make it ready
@@ -326,21 +357,11 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
-    def compact(self):
-        """
-        Compact this version with previous versions to make it an anchor
-        :return:
-        """
-        raise NotImplementedError
-
+    @_check_draft_status
     def rollback(self):
         """
         Rollback to the previous revision if it is in draft status
         """
-        if self.status != Status.DRAFT:
-            msg = '{} is not in Draft status. Please clone first to modify'.format(self)
-            raise RuntimeError(msg)
-
         if 0 < self.current_revision < len(self.revisions):
             revision = self.revisions[self.current_revision]
             revision.undo(self)
@@ -355,14 +376,11 @@ class Lambda(Model, ParametrizedMixin):
                 logger.error(msg)
                 raise RuntimeError(msg)
 
+    @_check_draft_status
     def forward(self):
         """
         Forward to the next revision if it is in draft status
         """
-        if self.status != Status.DRAFT:
-            msg = '{} is not in Draft status. Please clone first to modify'.format(self)
-            raise RuntimeError(msg)
-
         if self.current_revision < len(self.revisions) - 1:
             revision = self.revisions[self.current_revision + 1]
             revision.redo(self)
@@ -393,25 +411,6 @@ class Lambda(Model, ParametrizedMixin):
     def path(self):
         return '{}/{}.{}'.format(self.folder, self.version, self.PARQUET_EXT)
 
-    @staticmethod
-    def _overwrite_with_delta(lam, df):
-        """
-        Overwrite the existing dataframe with the delta dataframe from the given Lambda, assuming it is the same Lambda
-        with different version.
-        :param lam: the delta data from the Lambda
-        :type lam: Lambda
-        :param df: the base DataFrame
-        :type df: DataFrame
-        :return: the modified DataFrame
-        :rtype: DataFrame
-        """
-        try:
-            delta = pd.read_parquet(lam.path)
-            df.loc[delta.index, delta.columns] = delta.values
-        except FileNotFoundError:
-            pass
-        return df
-
     def create_folder(self):
         """
         Create the folder for the namespace.
@@ -424,6 +423,30 @@ class Lambda(Model, ParametrizedMixin):
             if e.errno != errno.EEXIST:
                 raise
 
+    def overwrite_with_delta(self, df):
+        """
+        Overwrite the existing dataframe with the delta dataframe, assuming it is the same Lambda
+        with different version.
+        :param df: the base DataFrame
+        :type df: DataFrame
+        :return: the modified DataFrame
+        :rtype: DataFrame
+        """
+        try:
+            delta = pd.read_parquet(self.path)
+            df.loc[delta.index, delta.columns] = delta.values
+        except FileNotFoundError:
+            pass
+        return df
+
+    @property
+    def _tensor_columns(self):
+        return ['{}_{}'.format(self.COLUMN_TENSOR, i) for i in np.prod(self.shape)]
+
+    @property
+    def _tensor_column_types(self):
+        return [('{}_{}'.format(self.COLUMN_TENSOR, i), self.ttype) for i in np.prod(self.shape)]
+
     def empty_data(self):
         """
         Create an empty data frame
@@ -431,8 +454,15 @@ class Lambda(Model, ParametrizedMixin):
         :rtype: DataFrame
         """
         df = DataFrame(columns=[self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
-                                self.COLUMN_TOMBSTONE] + [v.name for v in self.variables])
-        return df.astype({})
+                                self.COLUMN_TOMBSTONE] + self._tensor_columns + [v.name for v in self.variables])
+        types = dict([(self.COLUMN_OID, self.COLUMN_OID_T),
+                      (self.COLUMN_PROB, self.COLUMN_PROB_T),
+                      (self.COLUMN_LABEL, self.COLUMN_LABEL_T),
+                      (self.COLUMN_TIMESTAMP, self.COLUMN_TIMESTAMP_T),
+                      (self.COLUMN_TOMBSTONE, self.COLUMN_TOMBSTONE_T)]
+                     + self._tensor_column_types
+                     + [(v.name, v.type_.dtype) for v in self.variables])
+        return df.astype(types)
 
     def load_data(self):
         """
@@ -451,14 +481,14 @@ class Lambda(Model, ParametrizedMixin):
             blocks.append(lam)
         df = self.empty_data()
         for lam in reversed(blocks):
-            df = self._overwrite_with_delta(lam, df)
+            df = lam.overwrite_with_delta(df)
         # Choose the rows still alive
         self.df = df[~df[self.COLUMN_TOMBSTONE]]
         return self.df
 
     def save_data(self):
         """
-        Save data as the delta. Each revision produces a small delta, the overall delta combines all revision deltas.
+        Save data as a delta. Each revision produces a small delta, the overall delta combines all revision deltas.
         :return: the delta data
         :rtype: DataFrame
         """

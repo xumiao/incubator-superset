@@ -4,14 +4,10 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
-from sqlalchemy import Column, Integer, String, exists
-from sqlalchemy.dialects.postgresql import ARRAY
-from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import exists
 
 from norm.config import db
 from norm.models.norm import Lambda, Variable, Status
-
-import pandas as pd
 
 import logging
 import traceback
@@ -66,6 +62,7 @@ class NativeLambda(Lambda):
                          variables=variables,
                          dtype=dtype)
         self.status = Status.READY
+        self.shape = []
 
 
 @Register()
@@ -215,8 +212,6 @@ class TensorLambda(NativeLambda):
         'polymorphic_identity': 'lambda_native_tensor'
     }
 
-    shape = Column(ARRAY(Integer), default=[300])
-
     def __init__(self, dtype, shape):
         super().__init__(name='Tensor[{}]{}'.format(dtype, str(tuple(shape))),
                          description='Tensor, [2.2, 3.2]',
@@ -225,8 +220,6 @@ class TensorLambda(NativeLambda):
         assert(isinstance(shape, list) or isinstance(shape, tuple))
         assert(all([isinstance(element, int) for element in shape]))
         self.shape = list(shape)
+        self.ttype = dtype
 
-    @hybrid_property
-    def dim(self):
-        return len(self.shape)
 
