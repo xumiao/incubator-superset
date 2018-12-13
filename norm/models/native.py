@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 from sqlalchemy import exists
 
 from norm.config import db
-from norm.models.norm import Lambda, Variable, Status
+from norm.models.norm import Lambda, Variable, Status, Level
 
 import logging
 import traceback

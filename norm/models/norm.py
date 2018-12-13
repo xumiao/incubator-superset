@@ -13,7 +13,7 @@ import enum
 
 from future.standard_library import install_aliases
 
-from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, DateTime, Enum, desc, UniqueConstraint
+from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, DateTime, Enum, desc, UniqueConstraint, orm
 from sqlalchemy import Table
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -75,36 +75,86 @@ class Revision(Model, ParametrizedMixin):
     """Revision of the Lambda. All revisions for the same version are executed in memory."""
     __tablename__ = 'revisions'
 
+    PARQUET_EXT = 'parq'
+
     id = Column(Integer, primary_key=True, autoincrement=True)
     mode = Column(Enum(RevisionMode), default=RevisionMode.NEW, nullable=False)
     query = Column(Text, default='')
+    lambda_id = Column(Integer, ForeignKey("lambdas.id"))
+    lam = relationship("Lambda", back_populates="revisions")
 
-    def apply(self, lam):
-        """
-        Apply revision on the given Lambda
-        :param lam: the Lambda function to be applied on
-        :type lam: Lambda
-        :return: the revised Lambda
-        :rtype: Lambda
-        """
-        raise NotImplementedError
+    def __init__(self, mode, query):
+        self.mode = mode
+        self.query = query
+        self._delta = None
 
+    @orm.reconstructor
+    def init_on_load(self):
+        self._delta = None
+
+    @property
+    def path(self):
+        return '{}/{}.{}'.format(self.lam.folder, self.id, self.PARQUET_EXT)
+
+    @property
     def delta(self):
         """
-        Delta data that can be re-applied on the data.
-        :return: the delta data
-        :rtype: DataFrame or None
+        Retrieve the delta. Load from path if not in memory.
+        :return: the delta DataFrame
+        :rtype: DataFrame
         """
-        raise NotImplementedError
+        if self._delta is not None:
+            return self._delta
 
-    def redo(self, lam):
+        try:
+            self._delta = pd.read_parquet(self.path)
+        except FileNotFoundError:
+            msg = 'Can not find delta from {}'.format(self.path)
+            logger.error(msg)
+            raise RuntimeError(msg)
+        except:
+            self._delta = None
+        return self._delta
+
+    def save(self):
+        if self.delta is None:
+            return
+
+        try:
+            self.delta.to_parquet(self.path)
+        except IOError:
+            msg = 'IO problem: can not save delta to {}'.format(self.path)
+            logger.error(msg)
+            raise
+        except:
+            msg = 'Other problem: can not save delta to {}'.format(self.path)
+            logger.error(msg)
+            raise
+
+    def apply(self):
         """
-        Re-apply revision on the given Lambda
-        :param lam: the Lambda function to be applied on
-        :type lam: Lambda
+        Apply revision on the given Lambda and create a delta
         :return: the revised Lambda
         :rtype: Lambda
         """
+        raise NotImplementedError
+
+    def redo(self, data_only=False):
+        """
+        Re-apply revision on the given Lambda
+        :param data_only: only apply on the data, not on the schema. It is true at the time of loading data
+        :type data_only: bool
+        :return: the revised Lambda
+        :rtype: Lambda
+        """
+        delta = self.delta
+        if delta is not None:
+            self.lam.df.loc[delta.index, delta.columns] = delta.values
+
+        if data_only:
+            return self.lam
+
+        # TODO schema changing
         raise NotImplementedError
 
     def undo(self, lam):
@@ -117,13 +167,6 @@ class Revision(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
-
-lambda_revision = Table(
-    'lambda_revision', metadata,
-    Column('id', Integer, primary_key=True),
-    Column('lambda_id', Integer, ForeignKey('lambdas.id')),
-    Column('revision_id', Integer, ForeignKey('revisions.id')),
-)
 
 lambda_variable = Table(
     'lambda_variable', metadata,
@@ -138,6 +181,20 @@ class Status(enum.Enum):
     READY = 1
 
 
+class Level(enum.IntEnum):
+    """
+    Different computational level for Lambda functions:
+        1. any function that can compute the outputs given inputs is at level computable.
+        2. any function that can record the input-output as data such that a query can search through data to provide
+           statistics and aggregations is at level queryable.
+        3. any function that can adapt the parameters by fitting the recorded input-output data with respect to a
+           certain objective function.
+    """
+    COMPUTABLE = 0
+    QUERYABLE = 1
+    LEARNABLE = 2
+
+
 def default_version(context):
     params = context.get_current_parameters()
     namespace = params['namespace']
@@ -149,8 +206,6 @@ class Lambda(Model, ParametrizedMixin):
     """Lambda model is a function"""
     __tablename__ = 'lambdas'
     category = Column(String(128))
-
-    PARQUET_EXT = 'parq'
 
     COLUMN_OUTPUT = 'output'
     COLUMN_LABEL = 'label'
@@ -174,6 +229,8 @@ class Lambda(Model, ParametrizedMixin):
     # tensor type and shape
     ttype = Column(String(16), default='float32')
     shape = Column(ARRAY(Integer), default=[100])
+    # complexity level
+    level = Column(Enum(Level), default=Level.COMPUTABLE)
     # owner
     created_by_id = Column(Integer, ForeignKey(user_model.id))
     owner = relationship(user_model, backref='lambdas', foreign_keys=[created_by_id])
@@ -190,8 +247,8 @@ class Lambda(Model, ParametrizedMixin):
     merged_from_ids = Column(ARRAY(Integer))
     version = Column(Integer, default=default_version, nullable=False)
     # revision
-    revisions = relationship(Revision, secondary=lambda_revision)
-    current_revision = Column(Integer, default=0)
+    revisions = relationship(Revision)
+    current_revision = Column(Integer, default=-1)
     status = Column(Enum(Status), default=Status.DRAFT)
     # license
     license_id = Column(Integer, ForeignKey(License.id))
@@ -205,7 +262,8 @@ class Lambda(Model, ParametrizedMixin):
 
     __table_args__ = tuple(UniqueConstraint('namespace', 'name', 'version', name='unique_lambda'))
 
-    def __init__(self, namespace='', name='', description='', params='{}', variables=None, dtype=None):
+    def __init__(self, namespace='', name='', description='', params='{}', variables=None, dtype=None, ttype=None,
+                 shape=None):
         self.id = None
         self.namespace = namespace
         self.name = name
@@ -217,9 +275,17 @@ class Lambda(Model, ParametrizedMixin):
         self.merged_from_ids = []
         self.variables = variables or []
         self.revisions = []
-        self.current_revision = 0
+        self.current_revision = -1
+        self.dtype = dtype or 'object'
+        self.ttype = ttype or 'float32'
+        self.shape = shape or [100]
+        self.anchor = True
+        self.level = Level.COMPUTABLE
         self.df = None
-        self.dtype = dtype
+
+    @orm.reconstructor
+    def init_on_load(self):
+        self.df = None
 
     @hybrid_property
     def nargs(self):
@@ -266,8 +332,11 @@ class Lambda(Model, ParametrizedMixin):
 
         lam = self.clone()
         lam.merged_from_ids = [o.id for o in others]
-
-        # TODO: merge implementation
+        for o in others:
+            lam.revisions.extend(o.revisions)
+        while not self.end_of_revisions:
+            self.forward()
+        lam.status = Status.READY
         return lam
 
     def compact(self):
@@ -288,7 +357,36 @@ class Lambda(Model, ParametrizedMixin):
         def wrapper(self, *args, **kwargs):
             if self.status != Status.DRAFT:
                 msg = '{} is not in Draft status. Please clone first to modify'.format(self)
+                logger.error(msg)
                 raise RuntimeError(msg)
+            return func(self, *args, **kwargs)
+        return wrapper
+
+    def _only_queryable(func):
+        """
+        A decorator to bypass the function if the current Lambda is below queryable
+        :param func: a function to wrap
+        :type func: Callable
+        :return: a wrapped function
+        :rtype: Callable
+        """
+        def wrapper(self, *args, **kwargs):
+            if self.level < Level.QUERYABLE:
+                return
+            return func(self, *args, **kwargs)
+        return wrapper
+
+    def _only_learnable(func):
+        """
+        A decorator to bypass the function if the current Lambda is below learnable
+        :param func: a function to wrap
+        :type func: Callable
+        :return: a wrapped function
+        :rtype: Callable
+        """
+        def wrapper(self, *args, **kwargs):
+            if self.level < Level.LEARNABLE:
+                return
             return func(self, *args, **kwargs)
         return wrapper
 
@@ -348,26 +446,35 @@ class Lambda(Model, ParametrizedMixin):
         raise NotImplementedError
 
     @_check_draft_status
-    def save(self, overwrite=False):
+    def save(self):
         """
-        Save the current version and make it ready
-        :param overwrite: whether to overwrite the existing object
-        :type overwrite: Boolean
-        :return:
+        Save the current version
         """
-        raise NotImplementedError
+        self._save_data()
+        self._save_model()
+
+    @property
+    def empty_revisions(self):
+        return len(self.revisions) == 0
+
+    @property
+    def end_of_revisions(self):
+        return self.current_revision == len(self.revisions) - 1
+
+    @property
+    def begin_of_revisions(self):
+        return self.current_revision == -1
 
     @_check_draft_status
     def rollback(self):
         """
         Rollback to the previous revision if it is in draft status
         """
-        if 0 < self.current_revision < len(self.revisions):
-            revision = self.revisions[self.current_revision]
-            revision.undo(self)
+        if 0 <= self.current_revision < len(self.revisions):
+            self.revisions[self.current_revision].undo()
             self.current_revision -= 1
         else:
-            if self.current_revision == 0:
+            if self.current_revision == -1:
                 msg = '{} has already rolled back to the beginning of the version.\n ' \
                       'Might want to rollback the version'.format(self)
                 logger.warning(msg)
@@ -382,8 +489,7 @@ class Lambda(Model, ParametrizedMixin):
         Forward to the next revision if it is in draft status
         """
         if self.current_revision < len(self.revisions) - 1:
-            revision = self.revisions[self.current_revision + 1]
-            revision.redo(self)
+            self.revisions[self.current_revision + 1].redo()
             self.current_revision += 1
         else:
             if self.current_revision == len(self.revisions) - 1:
@@ -405,13 +511,11 @@ class Lambda(Model, ParametrizedMixin):
     def folder(self):
         return '{}/{}/{}'.format(config.DATA_STORAGE_ROOT,
                                  self.namespace.replace('.', '/'),
-                                 self.name)
+                                 self.name,
+                                 self.version)
 
-    @property
-    def path(self):
-        return '{}/{}.{}'.format(self.folder, self.version, self.PARQUET_EXT)
-
-    def create_folder(self):
+    @_only_queryable
+    def _create_folder(self):
         """
         Create the folder for the namespace.
         """
@@ -423,82 +527,84 @@ class Lambda(Model, ParametrizedMixin):
             if e.errno != errno.EEXIST:
                 raise
 
-    def overwrite_with_delta(self, df):
-        """
-        Overwrite the existing dataframe with the delta dataframe, assuming it is the same Lambda
-        with different version.
-        :param df: the base DataFrame
-        :type df: DataFrame
-        :return: the modified DataFrame
-        :rtype: DataFrame
-        """
-        try:
-            delta = pd.read_parquet(self.path)
-            df.loc[delta.index, delta.columns] = delta.values
-        except FileNotFoundError:
-            pass
-        return df
-
     @property
     def _tensor_columns(self):
-        return ['{}_{}'.format(self.COLUMN_TENSOR, i) for i in np.prod(self.shape)]
+        return ['{}_{}'.format(self.COLUMN_TENSOR, i) for i in range(int(np.prod(self.shape)))]
 
     @property
-    def _tensor_column_types(self):
-        return [('{}_{}'.format(self.COLUMN_TENSOR, i), self.ttype) for i in np.prod(self.shape)]
+    def _all_columns(self):
+        return [self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
+                self.COLUMN_TOMBSTONE] + self._tensor_columns + [v.name for v in self.variables]
 
-    def empty_data(self):
+    @property
+    def _all_column_types(self):
+        return [self.COLUMN_OID_T, self.COLUMN_PROB_T, self.COLUMN_LABEL_T, self.COLUMN_TIMESTAMP_T,
+                self.COLUMN_TOMBSTONE_T] + [self.ttype] * len(self._tensor_columns) + \
+               [v.type_.dtype for v in self.variables]
+
+    @_only_queryable
+    def _empty_data(self):
         """
         Create an empty data frame
         :return: the data frame with columns
         :rtype: DataFrame
         """
-        df = DataFrame(columns=[self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
-                                self.COLUMN_TOMBSTONE] + self._tensor_columns + [v.name for v in self.variables])
-        types = dict([(self.COLUMN_OID, self.COLUMN_OID_T),
-                      (self.COLUMN_PROB, self.COLUMN_PROB_T),
-                      (self.COLUMN_LABEL, self.COLUMN_LABEL_T),
-                      (self.COLUMN_TIMESTAMP, self.COLUMN_TIMESTAMP_T),
-                      (self.COLUMN_TOMBSTONE, self.COLUMN_TOMBSTONE_T)]
-                     + self._tensor_column_types
-                     + [(v.name, v.type_.dtype) for v in self.variables])
-        return df.astype(types)
+        df = DataFrame(columns=self._all_columns)
+        return df.astype(dict(zip(self._all_columns, self._all_column_types)))
 
-    def load_data(self):
+    @_only_queryable
+    def _load_data(self):
         """
         Load data if it exists. If the current version is not an anchor, the previous versions will be combined.
         :return: the combined data
         :rtype: DataFrame
         """
-        lam = self
-        blocks = [self]
-        while not lam.anchor:
-            if lam.cloned_from is None:
-                msg = 'The chain is broken, can not find the anchor version for {}.{}\n' \
-                    .format(lam.namespace, lam.name)
-                raise RuntimeError(msg)
-            lam = lam.cloned_from
-            blocks.append(lam)
-        df = self.empty_data()
-        for lam in reversed(blocks):
-            df = lam.overwrite_with_delta(df)
+        if self.df is not None:
+            return self.df
+
+        if self.anchor:
+            self.df = self._empty_data()
+        elif self.cloned_from is None:
+            msg = "Failed to find the anchor version. The chain is broken for {}".format(self)
+            logger.error(msg)
+            raise RuntimeError(msg)
+        else:
+            self.df = self.cloned_from._load_data()
+
+        for i in range(self.current_revision + 1):
+            # only change the dataframe, not lambda schema as it is already done
+            self.revisions[i].redo(data_only=True)
+
         # Choose the rows still alive
-        self.df = df[~df[self.COLUMN_TOMBSTONE]]
+        self.df = self.df[~self.df[self.COLUMN_TOMBSTONE]]
         return self.df
 
-    def save_data(self):
+    @_only_queryable
+    def _save_data(self):
         """
-        Save data as a delta. Each revision produces a small delta, the overall delta combines all revision deltas.
-        :return: the delta data
-        :rtype: DataFrame
+        Save all revisions' data
         """
-        df = self.empty_data()
-        for revision in self.revisions:
-            delta = revision.delta()
-            df.loc[delta.index, delta.columns] = delta.values
         if not os.path.exists(self.folder):
-            self.create_folder()
-        df.to_parquet(self.path)
+            self._create_folder()
+
+        for revision in self.revisions:
+            revision.save()
+
+    @_only_learnable
+    def _load_model(self):
+        """
+        Load a learned model
+        :return:
+        """
+        raise NotImplementedError
+
+    @_only_learnable
+    def _save_model(self):
+        """
+        Save a learned model
+        :return:
+        """
+        raise NotImplementedError
 
     def query(self, assignments=None, filters=None, projections=None):
         if projections is None:
