@@ -52,7 +52,7 @@ class NormCompiler(normListener):
         self.user = current_user()
         self.context_namespace = '{}.{}'.format(config.CONTEXT_NAMESPACE_STUB, context_id)
         self.user_namespace = '{}.{}'.format(config.USER_NAMESPACE_STUB, self.user.username)
-        from norm.models.native import NativeLambda
+        from norm.models import NativeLambda
         self.search_namespaces = {NativeLambda.NAMESPACE, self.context_namespace, self.user_namespace}
         self.stack = []
         self.df = None
@@ -196,12 +196,9 @@ class NormCompiler(normListener):
         self.stack.append(Export('.'.join(namespace), type_, variable))
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
-        if ctx.OMMIT():
-            self.stack.append(ArgumentDeclaration(OMMIT, None))
-        else:
-            type_name = self.stack.pop()
-            variable_name = self.stack.pop()
-            self.stack.append(ArgumentDeclaration(variable_name, type_name))
+        type_name = self.stack.pop()
+        variable_name = self.stack.pop()
+        self.stack.append(ArgumentDeclaration(variable_name, type_name))
 
     def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):
         args = reversed([self.stack.pop() for ch in ctx.children

@@ -32,9 +32,7 @@ imports
 
 SPACED_IMPORT: 'import' [ \t]*;
 
-argumentDeclaration
-    : OMMIT
-    | variableName WSS? COLON WSS? typeName;
+argumentDeclaration : variableName WSS? COLON WSS? typeName;
 
 argumentDeclarations: argumentDeclaration (WSS? COMMA WSS? argumentDeclaration)*;
 

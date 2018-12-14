@@ -575,8 +575,8 @@ class Lambda(Model, ParametrizedMixin):
             # only change the dataframe, not lambda schema as it is already done
             self.revisions[i].redo(data_only=True)
 
-        # Choose the rows still alive
-        self.df = self.df[~self.df[self.COLUMN_TOMBSTONE]]
+        # Choose the rows still alive and the columns specified in schema
+        self.df = self.df[self._all_columns][~self.df[self.COLUMN_TOMBSTONE]]
         return self.df
 
     @_only_queryable
@@ -651,32 +651,6 @@ class KerasLambda(Lambda):
     @lazy_property
     def keras_model(self):
         return None
-
-    def __call__(self, *args, **kwargs):
-        """
-        TODO: implement
-        """
-        pass
-
-
-class PythonLambda(Lambda):
-    APPLY_FUNC_NAME = 'apply'
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'lambda_python'
-    }
-
-    @lazy_property
-    def apply_func(self):
-        try:
-            d = {}
-            exec(dedent(self.code), d)
-            return d.get(self.APPLY_FUNC_NAME)  # Should fail if the definition does not exist
-        except:
-            msg = 'Can not load apply function for {} : {} '.format(str(self), self.code)
-            logger.error(msg)
-            logger.debug(traceback.print_exc())
-            raise RuntimeError(msg)
 
     def __call__(self, *args, **kwargs):
         """

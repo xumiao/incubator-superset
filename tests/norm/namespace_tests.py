@@ -1,5 +1,6 @@
 """Unit tests for Norm"""
 from tests.norm.utils import NormTestCase
+from norm.models import Status
 
 
 class NamespaceTestCase(NormTestCase):
@@ -14,6 +15,14 @@ class NamespaceTestCase(NormTestCase):
         lam = self.execute("import norm.test.Tester;")
         self.assertTrue('norm.test' in self.executor.search_namespaces)
         self.assertTrue(lam is not None)
+        self.assertTrue(lam.namespace == 'norm.test')
+
+    def test_importing_python_type(self):
+        lam = self.execute("import python.numpy.array;")
+        self.assertTrue(lam is not None)
+        self.assertTrue(lam.namespace == 'python.numpy')
+        self.assertTrue(lam.name == 'array')
+        self.assertTrue(lam.status == Status.READY)
 
     def test_renaming(self):
         self.execute("Tester(dummy:Integer);")

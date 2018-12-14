@@ -3,8 +3,8 @@ from norm.executable.type import TypeName
 
 import logging
 
-from norm.models.mixins import new_version
-from norm.models.norm import Status
+from norm.models import new_version
+from norm.models import Status
 
 logger = logging.getLogger(__name__)
 
@@ -43,13 +43,14 @@ class Import(NormExecutable):
             if lam is None:
                 msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.namespace)
                 raise NormError(msg)
-            alias = lam.clone()
-            alias.namespace = context.context_namespace
             if self.variable:
+                alias = lam.clone()
+                alias.namespace = context.context_namespace
                 alias.name = self.variable
-            assert(alias.version is None)
-            session.add(alias)
-            return alias
+                session.add(alias)
+                return alias
+            else:
+                return lam
         else:
             return self.namespace
 

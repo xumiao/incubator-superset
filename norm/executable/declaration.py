@@ -1,7 +1,5 @@
-import pandas as pd
-
 from norm.executable import NormExecutable, NormError
-from norm.models.norm import Lambda, Status
+from norm.models import Lambda, Status
 
 
 class ArgumentDeclaration(NormExecutable):
@@ -23,13 +21,14 @@ class ArgumentDeclaration(NormExecutable):
         Create variables or retrieve variables
         :rtype: superset.models.norm.Variable
         """
+        # TODO: joinly search the type for the variable
         lam = self.variable_type.execute(session, context)
         if lam is None:
             msg = "Type {} for variable {} has not been declared yet"\
                 .format(self.variable_type.name, self.variable_name)
             raise NormError(msg)
 
-        from norm.models.norm import Variable
+        from norm.models import Variable
         var = session.query(Variable).filter(Variable.name == self.variable_name.name,
                                              Variable.type_id == lam.id).scalar()
         if var is None:

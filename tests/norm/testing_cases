@@ -1,5 +1,5 @@
 // Declare lambdas
-test(a:String, b:Int);
+test(a:String, b:Integer);
 
 // Export lambdas
 export test@3 norm.test;
@@ -8,7 +8,13 @@ export test@3 norm.test;
 import norm.test.test@4 as tt;
 
 // Add another attribute
-test(..., t:Datetime);
+test &= (t:Datetime);
+
+// Rename an attribute
+test.rename(a, c);
+
+// Retype attributes and add another attribute
+test &= (t:String, p:Person);
 
 // Add another attribute implicitly with values
 import time.now;
@@ -45,8 +51,7 @@ test(a?) & extract(a, r'sf')?sf;
 test(a?) & extract(a, r'sf{\W+}{[0-9]+}')?(v1, v2);
 
 // Access a nested attribute
-test(..., p:person);
-test(p?) & extract(p.name, r'tom')?is_tom;
+test(p?) & extract(p.name, r'^tom')?is_tom;
 
 
 // Slicing with one object

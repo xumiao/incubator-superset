@@ -37,9 +37,8 @@ def init():
 @manager.command
 def init_norm():
     """Inits the Norm models"""
-    from norm.models.native import Register
-    Register.register()
-    from norm.models.license import register_licenses
+    from norm.models import RegisterNatives, register_licenses
+    RegisterNatives.register()
     register_licenses()
 
 

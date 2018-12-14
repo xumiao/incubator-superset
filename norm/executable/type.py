@@ -1,8 +1,7 @@
 from sqlalchemy.dialects import postgresql
 
 from norm.executable import NormExecutable, NormError
-from norm.models.native import ListLambda
-from norm.models.norm import Lambda, Variable, retrieve_type, Status
+from norm.models import ListLambda, Lambda, PythonLambda, Variable, retrieve_type, Status
 
 
 class TypeName(NormExecutable):
@@ -41,6 +40,19 @@ class TypeName(NormExecutable):
         else:
             if self.namespace == context.context_namespace:
                 lam = retrieve_type(self.namespace, self.name, self.version, session)
+            elif self.namespace.startswith('python'):
+                lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
+                if lam is None:
+                    # create a new PythonLambda
+                    d = {}
+                    exec('from {} import {}'.format(self.namespace[7:], self.name), d)
+                    v = d.get(self.name)
+                    if not callable(v):
+                        msg = '{} from {} is not a python function'.format(self.name, self.namespace)
+                        raise NormError(msg)
+                    # TODO: decide output type and package version
+                    lam = PythonLambda(namespace=self.namespace, name=self.name, description=v.__doc__)
+                    session.add(lam)
             else:
                 lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
 

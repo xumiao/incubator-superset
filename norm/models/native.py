@@ -1,4 +1,4 @@
-"""A collection of ORM sqlalchemy models for Lambda"""
+"""A collection of ORM sqlalchemy models for NativeLambda"""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -7,14 +7,14 @@ from __future__ import unicode_literals
 from sqlalchemy import exists
 
 from norm.config import db
-from norm.models.norm import Lambda, Variable, Status, Level
+from norm.models.norm import Lambda, Variable, Status
 
 import logging
 import traceback
 logger = logging.getLogger(__name__)
 
 
-class Register(object):
+class RegisterNatives(object):
     types = []
 
     def __init__(self, *args, **kwargs):
@@ -65,7 +65,7 @@ class NativeLambda(Lambda):
         self.shape = []
 
 
-@Register()
+@RegisterNatives()
 class TypeLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_type'
@@ -77,7 +77,7 @@ class TypeLambda(NativeLambda):
                          variables=[])
 
 
-@Register()
+@RegisterNatives()
 class AnyLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_any'
@@ -106,7 +106,7 @@ class ListLambda(NativeLambda):
                          variables=[variable])
 
 
-@Register()
+@RegisterNatives()
 class BooleanLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_boolean'
@@ -119,7 +119,7 @@ class BooleanLambda(NativeLambda):
                          dtype='bool')
 
 
-@Register()
+@RegisterNatives()
 class FloatLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_float'
@@ -132,7 +132,7 @@ class FloatLambda(NativeLambda):
                          dtype='float')
 
 
-@Register()
+@RegisterNatives()
 class IntegerLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_integer'
@@ -145,7 +145,7 @@ class IntegerLambda(NativeLambda):
                          dtype='int')
 
 
-@Register()
+@RegisterNatives()
 class StringLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_string'
@@ -157,7 +157,7 @@ class StringLambda(NativeLambda):
                          variables=[])
 
 
-@Register()
+@RegisterNatives()
 class PatternLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_pattern'
@@ -169,7 +169,7 @@ class PatternLambda(NativeLambda):
                          variables=[])
 
 
-@Register()
+@RegisterNatives()
 class UUIDLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_uuid'
@@ -181,7 +181,7 @@ class UUIDLambda(NativeLambda):
                          variables=[])
 
 
-@Register()
+@RegisterNatives()
 class URLLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_url'
@@ -193,7 +193,7 @@ class URLLambda(NativeLambda):
                          variables=[])
 
 
-@Register()
+@RegisterNatives()
 class DatetimeLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_datetime'
@@ -206,7 +206,7 @@ class DatetimeLambda(NativeLambda):
                          dtype='datetime64[ns]')
 
 
-@Register(dtype='float32', shape=[300])
+@RegisterNatives(dtype='float32', shape=[300])
 class TensorLambda(NativeLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_native_tensor'

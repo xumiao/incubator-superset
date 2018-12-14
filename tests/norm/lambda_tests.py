@@ -2,7 +2,7 @@
 import os
 
 from tests.norm.utils import NormTestCase
-from norm.models.norm import Lambda, Variable, retrieve_type, Status, Level
+from norm.models import Lambda, Variable, retrieve_type, Status, Level
 
 
 class LambdaTestCase(NormTestCase):
