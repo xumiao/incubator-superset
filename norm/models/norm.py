@@ -8,7 +8,6 @@ import os
 import errno
 
 from datetime import datetime
-from textwrap import dedent
 import enum
 
 from future.standard_library import install_aliases
@@ -28,7 +27,6 @@ from pandas import DataFrame
 import pandas as pd
 import numpy as np
 
-import traceback
 import logging
 logger = logging.getLogger(__name__)
 
@@ -60,112 +58,6 @@ class Variable(Model, ParametrizedMixin):
         self.id = None
         self.name = name
         self.type_ = type_
-
-
-class RevisionMode(enum.Enum):
-    NEW = 0  # a new implementation that discards all previous changes if any
-    CON = 1  # a conjunction of logical revisions
-    DIS = 2  # a disjunction of logical revisions
-    DEL = 3  # a deletion of logical revisions
-    MOD = 4  # a modification of variables, e.g., renaming or changing types
-    FIT = 5  # a model update
-
-
-class Revision(Model, ParametrizedMixin):
-    """Revision of the Lambda. All revisions for the same version are executed in memory."""
-    __tablename__ = 'revisions'
-
-    PARQUET_EXT = 'parq'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    mode = Column(Enum(RevisionMode), default=RevisionMode.NEW, nullable=False)
-    query = Column(Text, default='')
-    lambda_id = Column(Integer, ForeignKey("lambdas.id"))
-    lam = relationship("Lambda", back_populates="revisions")
-
-    def __init__(self, mode, query):
-        self.mode = mode
-        self.query = query
-        self._delta = None
-
-    @orm.reconstructor
-    def init_on_load(self):
-        self._delta = None
-
-    @property
-    def path(self):
-        return '{}/{}.{}'.format(self.lam.folder, self.id, self.PARQUET_EXT)
-
-    @property
-    def delta(self):
-        """
-        Retrieve the delta. Load from path if not in memory.
-        :return: the delta DataFrame
-        :rtype: DataFrame
-        """
-        if self._delta is not None:
-            return self._delta
-
-        try:
-            self._delta = pd.read_parquet(self.path)
-        except FileNotFoundError:
-            msg = 'Can not find delta from {}'.format(self.path)
-            logger.error(msg)
-            raise RuntimeError(msg)
-        except:
-            self._delta = None
-        return self._delta
-
-    def save(self):
-        if self.delta is None:
-            return
-
-        try:
-            self.delta.to_parquet(self.path)
-        except IOError:
-            msg = 'IO problem: can not save delta to {}'.format(self.path)
-            logger.error(msg)
-            raise
-        except:
-            msg = 'Other problem: can not save delta to {}'.format(self.path)
-            logger.error(msg)
-            raise
-
-    def apply(self):
-        """
-        Apply revision on the given Lambda and create a delta
-        :return: the revised Lambda
-        :rtype: Lambda
-        """
-        raise NotImplementedError
-
-    def redo(self, data_only=False):
-        """
-        Re-apply revision on the given Lambda
-        :param data_only: only apply on the data, not on the schema. It is true at the time of loading data
-        :type data_only: bool
-        :return: the revised Lambda
-        :rtype: Lambda
-        """
-        delta = self.delta
-        if delta is not None:
-            self.lam.df.loc[delta.index, delta.columns] = delta.values
-
-        if data_only:
-            return self.lam
-
-        # TODO schema changing
-        raise NotImplementedError
-
-    def undo(self, lam):
-        """
-        Revert the revision of the given Lambda
-        :param lam: the Lambda function to be reverted on
-        :type lam: Lambda
-        :return: the reverted Lambda
-        :rtype: Lambda
-        """
-        raise NotImplementedError
 
 
 lambda_variable = Table(
@@ -247,7 +139,7 @@ class Lambda(Model, ParametrizedMixin):
     merged_from_ids = Column(ARRAY(Integer))
     version = Column(Integer, default=default_version, nullable=False)
     # revision
-    revisions = relationship(Revision)
+    revisions = relationship('Revision')
     current_revision = Column(Integer, default=-1)
     status = Column(Enum(Status), default=Status.DRAFT)
     # license
@@ -394,56 +286,77 @@ class Lambda(Model, ParametrizedMixin):
     def conjunction(self):
         """
         Revise with conjunction (AND)
-        :return:
         """
-        raise NotImplementedError
+        from norm.models.revision import ConjunctionRevision
+        # TODO: implement the query
+        revision = ConjunctionRevision('')
+        self._add_revision(revision)
 
     @_check_draft_status
     def disjunction(self):
         """
         Revise with disjunction (OR)
-        :return:
         """
-        raise NotImplementedError
+        from norm.models.revision import DisjunctionRevision
+        # TODO: implement the query
+        revision = DisjunctionRevision('')
+        self._add_revision(revision)
+
+    def fit(self):
+        """
+        Fit the model with the existing data
+        """
+        from norm.models.revision import FitRevision
+        # TODO: implement the query
+        revision = FitRevision('')
+        self._add_revision(revision)
 
     @_check_draft_status
-    def add_variable(self, name, type_):
+    def add_variable(self, *variables):
         """
-        Add a new variable into the signature
-        :type name: str
-        :type type_: Lambda
-        :return:
+        Add new new variables to the Lambda
+        :type variables: Tuple[Variable]
         """
-        raise NotImplementedError
+        from norm.models.revision import AddVariableRevision
+        revision = AddVariableRevision(list(variables))
+        self._add_revision(revision)
 
     @_check_draft_status
-    def delete_variable(self, name):
+    def delete_variable(self, *names):
         """
-        Delete a variable from the signature
-        :type name: str
-        :return:
+        Delete variables from the Lambda
+        :type names: Tuple[str]
         """
-        raise NotImplementedError
+        from norm.models.revision import DeleteVariableRevision
+        revision = DeleteVariableRevision(list(names))
+        self._add_revision(revision)
 
     @_check_draft_status
-    def rename_variable(self, old_name, new_name):
+    def rename_variable(self, **renames):
         """
-        Change the variable name
-        :type old_name: str
-        :type new_name: str
-        :return:
+        Change a variable name to another. The argument is a on keyword argument format. The key should exist in
+        the Lambda and the value to be the target name.
+        :type renames: Dict[str, str]
         """
-        raise NotImplementedError
+        from norm.models.revision import RenameVariableRevision
+        revision = RenameVariableRevision(renames)
+        self._add_revision(revision)
 
     @_check_draft_status
-    def astype(self, name, new_type):
+    def astype(self, *variables):
         """
-        Change the type of the variable
-        :type name: str
-        :type new_type: Lambda
-        :return:
+        Change the type of variables. The variable names to be changed should exist in current Lambda. The new types
+        are specified in the variable type_ attribute.
+        :type variables: Tuple[Variable]
         """
-        raise NotImplementedError
+        from norm.models.revision import RetypeVariableRevision
+        revision = RetypeVariableRevision(list(variables))
+        self._add_revision(revision)
+
+    def _add_revision(self, revision):
+        self.revisions.append(revision)
+        revision.apply()
+        self.current_revision += 1
 
     @_check_draft_status
     def save(self):
@@ -571,9 +484,11 @@ class Lambda(Model, ParametrizedMixin):
         else:
             self.df = self.cloned_from._load_data()
 
+        from norm.models.revision import DeltaRevision
         for i in range(self.current_revision + 1):
-            # only change the dataframe, not lambda schema as it is already done
-            self.revisions[i].redo(data_only=True)
+            revision = self.revisions[i]
+            if isinstance(revision, DeltaRevision):
+                revision.redo()
 
         # Choose the rows still alive and the columns specified in schema
         self.df = self.df[self._all_columns][~self.df[self.COLUMN_TOMBSTONE]]
