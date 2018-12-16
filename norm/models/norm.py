@@ -17,6 +17,7 @@ from sqlalchemy import Table
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, with_polymorphic
+from sqlalchemy.ext.orderinglist import ordering_list
 
 from norm.models.mixins import lazy_property, ParametrizedMixin, new_version
 from norm.models.license import License
@@ -64,7 +65,7 @@ lambda_variable = Table(
     'lambda_variable', metadata,
     Column('id', Integer, primary_key=True),
     Column('lambda_id', Integer, ForeignKey('lambdas.id')),
-    Column('variable_id', Integer, ForeignKey('variables.id'))
+    Column('variable_id', Integer, ForeignKey('variables.id')),
 )
 
 
@@ -139,7 +140,7 @@ class Lambda(Model, ParametrizedMixin):
     merged_from_ids = Column(ARRAY(Integer))
     version = Column(Integer, default=default_version, nullable=False)
     # revision
-    revisions = relationship('Revision')
+    revisions = relationship('Revision', order_by='Revision.position', collection_class=ordering_list('position'))
     current_revision = Column(Integer, default=-1)
     status = Column(Enum(Status), default=Status.DRAFT)
     # license
@@ -289,7 +290,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         from norm.models.revision import ConjunctionRevision
         # TODO: implement the query
-        revision = ConjunctionRevision('')
+        revision = ConjunctionRevision('', '')
         self._add_revision(revision)
 
     @_check_draft_status
@@ -317,6 +318,8 @@ class Lambda(Model, ParametrizedMixin):
         Add new new variables to the Lambda
         :type variables: Tuple[Variable]
         """
+        if len(variables) == 0:
+            return
         from norm.models.revision import AddVariableRevision
         revision = AddVariableRevision(list(variables))
         self._add_revision(revision)
@@ -327,6 +330,8 @@ class Lambda(Model, ParametrizedMixin):
         Delete variables from the Lambda
         :type names: Tuple[str]
         """
+        if len(names) == 0:
+            return
         from norm.models.revision import DeleteVariableRevision
         revision = DeleteVariableRevision(list(names))
         self._add_revision(revision)
@@ -338,6 +343,8 @@ class Lambda(Model, ParametrizedMixin):
         the Lambda and the value to be the target name.
         :type renames: Dict[str, str]
         """
+        if len(renames) == 0:
+            return
         from norm.models.revision import RenameVariableRevision
         revision = RenameVariableRevision(renames)
         self._add_revision(revision)
@@ -349,6 +356,8 @@ class Lambda(Model, ParametrizedMixin):
         are specified in the variable type_ attribute.
         :type variables: Tuple[Variable]
         """
+        if len(variables) == 0:
+            return
         from norm.models.revision import RetypeVariableRevision
         revision = RetypeVariableRevision(list(variables))
         self._add_revision(revision)

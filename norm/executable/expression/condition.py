@@ -1,7 +1,7 @@
-from norm.executable import NormExecutable
+from norm.executable.expression.base import NormExpression
 
 
-class ConditionExpr(NormExecutable):
+class ConditionExpr(NormExpression):
 
     def __init__(self, op, lexpr, rexpr):
         """

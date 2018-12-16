@@ -32,6 +32,8 @@ class Revision(Model, ParametrizedMixin):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     query = Column(Text, default='')
+    position = Column(Integer)
+    description = Column(Text, default='')
     lambda_id = Column(Integer, ForeignKey("lambdas.id"))
     lam = relationship(Lambda, back_populates="revisions")
 
@@ -40,8 +42,9 @@ class Revision(Model, ParametrizedMixin):
         'polymorphic_on': category
     }
 
-    def __init__(self, query):
+    def __init__(self, query, description):
         self.query = query
+        self.description = description
 
     def save(self):
         """
@@ -86,7 +89,7 @@ class SchemaRevision(Revision):
     variables = relationship(Variable, secondary=revision_variable)
 
     def __init__(self):
-        super().__init__('')
+        super().__init__('', '')
 
     def save(self):
         pass
@@ -103,20 +106,16 @@ class AddVariableRevision(SchemaRevision):
 
     def __init__(self, variables):
         super().__init__()
-        assert(isinstance(variables, list))
-        assert(all(isinstance(v, Variable) for v in variables))
-        self.variables = variables
         current_variable_names = set((v.name for v in self.lam.variables))
-        new_variable_names = set((v.name for v in variables))
-        assert(current_variable_names.isdisjoint(new_variable_names))
+        self.variables = [v for v in variables if v.name not in current_variable_names]
 
     def apply(self):
-        self.lam.variables.extends(self._variables)
+        self.lam.variables.extends(self.variables)
 
     def undo(self):
-        for v in reversed(self._variables):
-            vp = self.lam.variables.pop()
-            assert(v.name == vp.name)
+        for v in reversed(self.variables):
+            popped_vp = self.lam.variables.pop()
+            assert(v.name == popped_vp.name)
 
 
 class RenameVariableRevision(SchemaRevision):
@@ -127,11 +126,9 @@ class RenameVariableRevision(SchemaRevision):
 
     def __init__(self, renames):
         super().__init__()
-        assert(isinstance(renames, dict))
-        self.renames = renames
         current_variable_names = set((v.name for v in self.lam.variables))
-        old_names = set(renames.keys())
-        assert(old_names.issubset(current_variable_names))
+        self.renames = dict((old_name, new_name) for old_name, new_name in renames.items()
+                            if old_name in current_variable_names)
 
     def apply(self):
         for v in self.lam.variables:
@@ -155,17 +152,16 @@ class RetypeVariableRevision(SchemaRevision):
 
     def __init__(self, variables):
         super().__init__()
-        assert(isinstance(variables, list))
-        self.variables = variables
         current_variable_names = set((v.name for v in self.lam.variables))
-        variable_names = set((v.name for v in variables))
-        assert(len(variables) == len(variable_names))
-        assert(variable_names.issubset(current_variable_names))
+        self.variables = [v for v in variables if v.name in current_variable_names]
+        variable_names = set((v.name for v in self.variables))
+        self.num = len(variable_names)
+        assert(len(self.variables) == len(variable_names))
         self.variables.extend([v for v in self.lam.variables if v.name in variable_names])
 
-    @property
-    def num(self):
-        return int(len(self.variables) / 2)
+    @orm.reconstructor
+    def init_on_load(self):
+        self.num = int(len(self.variables) / 2)
 
     def apply(self):
         to_variables = self.variables[:self.num]
@@ -193,9 +189,8 @@ class DeleteVariableRevision(SchemaRevision):
     def __init__(self, names):
         super().__init__()
         assert(isinstance(names, list))
-        self.renames = dict((name, '') for name in names)
         current_variable_names = set((v.name for v in self.lam.variables))
-        assert(set(names).issubset(current_variable_names))
+        self.renames = dict((name, '') for name in names if name in current_variable_names)
         self.variables = [v for v in self.lam.variables]
 
     def apply(self):
@@ -211,8 +206,8 @@ class DeltaRevision(Revision):
         'polymorphic_identity': 'revision_delta'
     }
 
-    def __init__(self, query):
-        super().__init__(query)
+    def __init__(self, query, description):
+        super().__init__(query, description)
         self._delta = None
 
     @orm.reconstructor
@@ -274,8 +269,8 @@ class ConjunctionRevision(DeltaRevision):
         'polymorphic_identity': 'revision_delta_conjunction'
     }
 
-    def __init__(self, query):
-        super().__init__(query)
+    def __init__(self, query, description):
+        super().__init__(query, description)
 
     def apply(self):
         pass
@@ -293,8 +288,8 @@ class DisjunctionRevision(DeltaRevision):
         'polymorphic_identity': 'revision_delta_disjunction'
     }
 
-    def __init__(self, query):
-        super().__init__(query)
+    def __init__(self, query, description):
+        super().__init__(query, description)
 
     def apply(self):
         pass
@@ -312,8 +307,8 @@ class FitRevision(DeltaRevision):
         'polymorphic_identity': 'revision_delta_fit'
     }
 
-    def __init__(self, query):
-        super().__init__(query)
+    def __init__(self, query, description):
+        super().__init__(query, description)
 
     def apply(self):
         pass

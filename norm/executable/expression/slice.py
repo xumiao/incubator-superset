@@ -1,7 +1,8 @@
 from norm.executable import NormExecutable
+from norm.executable.expression.base import NormExpression
 
 
-class SliceExpr(NormExecutable):
+class SliceExpr(NormExpression):
 
     def __init__(self, expr, start, end):
         """

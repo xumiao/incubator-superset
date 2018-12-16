@@ -1,9 +1,9 @@
 import pandas as pd
 
-from norm.executable import NormExecutable
+from norm.executable.expression.base import NormExpression
 
 
-class ArithmeticExpr(NormExecutable):
+class ArithmeticExpr(NormExpression):
 
     def __init__(self, constant, variable_name, op, expr1, expr2=None):
         """

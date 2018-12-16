@@ -1,9 +1,9 @@
-from norm.executable import NormExecutable
+from norm.executable.expression.base import NormExpression
 from norm.executable.expression.condition import ConditionExpr
 from norm.executable.expression.arithmetic import ArithmeticExpr
 
 
-class ArgumentExpr(NormExecutable):
+class ArgumentExpr(NormExpression):
 
     def __init__(self, variable, expr, projection):
         """

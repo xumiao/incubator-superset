@@ -1,5 +1,3 @@
-from sqlalchemy.dialects import postgresql
-
 from norm.executable import NormExecutable, NormError
 from norm.models import ListLambda, Lambda, PythonLambda, Variable, retrieve_type, Status
 
@@ -27,7 +25,7 @@ class TypeName(NormExecutable):
         s += '@' + str(self.version) if self.version is not None else ''
         return s
 
-    def execute(self, session, context, to_create=False):
+    def execute(self, session, context):
         """
         Retrieve the Lambda function by namespace, name, version.
         Note that user is encoded by the version.
@@ -55,12 +53,6 @@ class TypeName(NormExecutable):
                     session.add(lam)
             else:
                 lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
-
-        if lam is None and to_create:
-            #  create a new Lambda
-            lam = Lambda(namespace=self.namespace or context.context_namespace,
-                         name=self.name)
-            session.add(lam)
         return lam
 
 

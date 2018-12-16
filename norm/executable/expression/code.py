@@ -1,7 +1,7 @@
-from norm.executable import NormExecutable
+from norm.executable.expression.base import NormExpression
 
 
-class CodeExpr(NormExecutable):
+class CodeExpr(NormExpression):
 
     def __init__(self, mode, code):
         """

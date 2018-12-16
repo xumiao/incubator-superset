@@ -1,5 +1,5 @@
 from norm.models.mixins import Version
-from norm.models.norm import (Variable, lambda_variable, Lambda,
+from norm.models.norm import (Variable, lambda_variable, Lambda, Status, Level,
                               KerasLambda, retrieve_type)
 from norm.models.revision import (Revision, revision_variable, SchemaRevision, AddVariableRevision,
                                   DeleteVariableRevision, RenameVariableRevision, RetypeVariableRevision,

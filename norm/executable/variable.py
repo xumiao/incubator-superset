@@ -26,7 +26,6 @@ class VariableName(NormExecutable):
         """
 
         :param session:
-        :param user:
         :param context:
         :return:
         """

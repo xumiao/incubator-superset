@@ -1,11 +1,13 @@
 from norm.executable import NormExecutable
 from norm.executable.expression.argument import ArgumentExpr
 from norm.executable.variable import VariableName
+from norm.executable.expression.base import NormExpression
+
 
 import pandas as pd
 
 
-class EvaluationExpr(NormExecutable):
+class EvaluationExpr(NormExpression):
 
     def __init__(self, type_name, args):
         """
@@ -41,7 +43,7 @@ class EvaluationExpr(NormExecutable):
         return lam.query(assignments, conditions, projections)
 
 
-class ChainedEvaluationExpr(NormExecutable):
+class ChainedEvaluationExpr(NormExpression):
 
     def __init__(self, lexpr, rexpr):
         """

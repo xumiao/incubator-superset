@@ -44,6 +44,6 @@ class QueryExpr(NormExecutable):
                     var_name = self.expr2.projection.variable_name.name
                     df[var_name] = df[col].apply(extract)
                 else:
-                    df2 = self.expr2.execute(session, user)
+                    df2 = self.expr2.execute(session, context)
                     df = pd.concat([df, df2], axis=1)
         return df

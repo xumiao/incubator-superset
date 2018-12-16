@@ -3,7 +3,7 @@ from norm.executable.type import TypeName
 
 import logging
 
-from norm.models import new_version
+from norm.models.mixins import new_version
 from norm.models import Status
 
 logger = logging.getLogger(__name__)

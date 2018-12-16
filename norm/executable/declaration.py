@@ -69,17 +69,23 @@ class TypeDeclaration(NormExecutable):
         variables = [var_declaration.execute(session, context) for var_declaration in
                      reversed(self.argument_declarations)]
         self.type_name.namespace = context.context_namespace
-        lam = self.type_name.execute(session, context, to_create=True)  # type: Lambda
-        if lam.status == Status.DRAFT:
-            # If the lambda is a draft, we revise directly
+        lam = self.type_name.execute(session, context)  # type: Lambda
+        if lam is None:
+            #  Create a new Lambda
+            lam = Lambda(namespace=context.context_namespace, name=self.type_name.name)
             lam.description = self.description
             lam.variables = variables
+            session.add(lam)
             return lam
         else:
-            # If the lambda is ready, we clone to the context first and revise.
-            new_lam = lam.clone()
-            new_lam.description = self.description
-            new_lam.variables = variables
-            new_lam.status = Status.DRAFT
-            new_lam.namespace = context.context_namespace
-            return new_lam
+            assert(lam.status == Status.DRAFT)
+            # Revise the existing schema
+            current_variable_names = set(v.name for v in lam.variables)
+            new_variable_names = set(v.name for v in variables)
+            lam.delete_variable(*current_variable_names.difference(new_variable_names))
+            lam.astype(*variables)
+            lam.add_variable(*variables)
+            # TODO: make a doc change revision
+            if self.description:
+                lam.description = self.description
+
