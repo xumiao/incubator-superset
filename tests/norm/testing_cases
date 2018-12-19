@@ -12,6 +12,8 @@ test = 'sfs' & 4
      | 'fff' & 1
      ;
 test('aa', 6);
+// A new empty/default data
+test();
 
 // Add another attribute
 test &= (t:Datetime, p:Person);

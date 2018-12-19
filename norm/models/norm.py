@@ -70,6 +70,9 @@ lambda_variable = Table(
 
 
 class Status(enum.Enum):
+    """
+    Indicate whether the lambda function can be modified or not
+    """
     DRAFT = 0
     READY = 1
 
@@ -85,7 +88,7 @@ class Level(enum.IntEnum):
     """
     COMPUTABLE = 0
     QUERYABLE = 1
-    LEARNABLE = 2
+    ADAPTABLE = 2
 
 
 def default_version(context):
@@ -269,16 +272,16 @@ class Lambda(Model, ParametrizedMixin):
             return func(self, *args, **kwargs)
         return wrapper
 
-    def _only_learnable(func):
+    def _only_adaptable(func):
         """
-        A decorator to bypass the function if the current Lambda is below learnable
+        A decorator to bypass the function if the current Lambda is below adaptable
         :param func: a function to wrap
         :type func: Callable
         :return: a wrapped function
         :rtype: Callable
         """
         def wrapper(self, *args, **kwargs):
-            if self.level < Level.LEARNABLE:
+            if self.level < Level.ADAPTABLE:
                 return
             return func(self, *args, **kwargs)
         return wrapper
@@ -300,7 +303,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         from norm.models.revision import DisjunctionRevision
         # TODO: implement the query
-        revision = DisjunctionRevision('')
+        revision = DisjunctionRevision('', '')
         self._add_revision(revision)
 
     def fit(self):
@@ -309,7 +312,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         from norm.models.revision import FitRevision
         # TODO: implement the query
-        revision = FitRevision('')
+        revision = FitRevision('', '')
         self._add_revision(revision)
 
     @_check_draft_status
@@ -514,18 +517,25 @@ class Lambda(Model, ParametrizedMixin):
         for revision in self.revisions:
             revision.save()
 
-    @_only_learnable
+    @_only_adaptable
+    def _build_model(self):
+        """
+        Build an adaptable model
+        """
+        raise NotImplementedError
+
+    @_only_adaptable
     def _load_model(self):
         """
-        Load a learned model
+        Load an adapted model
         :return:
         """
         raise NotImplementedError
 
-    @_only_learnable
+    @_only_adaptable
     def _save_model(self):
         """
-        Save a learned model
+        Save an adapted model
         :return:
         """
         raise NotImplementedError
