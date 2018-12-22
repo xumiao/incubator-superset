@@ -8,8 +8,8 @@ export test@3 norm.test;
 import norm.test.test@4 as tt;
 
 // Adding some data
-test = 'sfs' & 4
-     | 'fff' & 1
+test =  'sfs' & 4
+     | ('fff' & 1)
      ;
 test('aa', 6);
 // A new empty/default data
@@ -33,6 +33,7 @@ test;
 test?;
 test(...);
 test(...)?;
+test('aa', ..., 6);
 test('aa', 6)?;
 test(a?);
 test(a?, b?);
@@ -76,6 +77,6 @@ test.p.group(by=name);
 test &= match(test.a, [r's', r'sf', r'aa'])?matched;
 
 // Column-wise expansion with list comprehension
-test &= [match(a, p)?var(v+p) for p in [r's', r'sf', r'aa']];
+test &= [match(a, p)?_(v+p) for p in [r's', r'sf', r'aa']];
 
 

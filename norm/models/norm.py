@@ -149,7 +149,6 @@ class Lambda(Model, ParametrizedMixin):
     # license
     license_id = Column(Integer, ForeignKey(License.id))
     license = relationship(License, foreign_keys=[license_id])
-    # price
 
     __mapper_args__ = {
         'polymorphic_identity': 'lambda',
@@ -308,12 +307,19 @@ class Lambda(Model, ParametrizedMixin):
 
     def fit(self):
         """
-        Fit the model with the existing data
+        Fit the model with all the existing data
         """
         from norm.models.revision import FitRevision
         # TODO: implement the query
         revision = FitRevision('', '')
         self._add_revision(revision)
+
+    def adapt(self):
+        """
+        Adapt the model with the data for this version
+        :return:
+        """
+        raise NotImplementedError
 
     @_check_draft_status
     def add_variable(self, *variables):

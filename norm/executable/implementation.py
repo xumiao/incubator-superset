@@ -40,6 +40,7 @@ class TypeImplementation(NormExecutable):
                 #  Create a new Lambda
                 lam = Lambda(namespace=context.context_namespace, name=self.type_.name)
                 session.add(lam)
+            # TODO
             lam.conjunction()
         elif self.op == ImplType.ORAS:
             pass

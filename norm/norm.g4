@@ -1,16 +1,18 @@
 grammar norm;
 
 script
-    : statement (WSS? statement)* WSS?
+    : statement ((WS|NS)? statement)* (WS|NS)?
     ;
 
 statement
     : comments SEMICOLON
-    | comments? imports WSS? SEMICOLON
-    | comments? exports WSS? SEMICOLON
-    | comments? WSS? typeDeclaration WSS? SEMICOLON
-    | comments? typeName (WSS? '=' WSS? | WSS? OR '=' WSS? | WSS? AND '=' WSS?) queryExpression WSS? SEMICOLON
-    | comments? queryExpression WSS? SEMICOLON
+    | comments? imports (WS|NS)? SEMICOLON
+    | comments? exports (WS|NS)? SEMICOLON
+    | comments? (WS|NS)? typeDeclaration (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? '=' (WS|NS)? newlineQueryExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? OR '=' (WS|NS)? newlineQueryExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? AND '=' (WS|NS)? newlineQueryExpression (WS|NS)? SEMICOLON
+    | comments? newlineQueryExpression (WS|NS)? SEMICOLON
     ;
 
 SINGLELINE: '//' ~[\r\n]* [\r\n]*;
@@ -20,23 +22,23 @@ comments: MULTILINE | SINGLELINE;
 
 exports
     : SPACED_EXPORT typeName
-    | SPACED_EXPORT typeName WSS? VARNAME (DOT VARNAME)* (WSS? AS WSS? VARNAME)?
+    | SPACED_EXPORT typeName (WS|NS)? VARNAME (DOT VARNAME)* ((WS|NS)? AS (WS|NS)? VARNAME)?
     ;
 
 SPACED_EXPORT: 'export' [ \t]*;
 
 imports
     : SPACED_IMPORT VARNAME (DOT VARNAME)* DOT '*'
-    | SPACED_IMPORT VARNAME (DOT VARNAME)* DOT typeName (WSS? AS WSS? VARNAME)?
+    | SPACED_IMPORT VARNAME (DOT VARNAME)* DOT typeName ((WS|NS)? AS (WS|NS)? VARNAME)?
     ;
 
 SPACED_IMPORT: 'import' [ \t]*;
 
-argumentDeclaration : variableName WSS? COLON WSS? typeName;
+argumentDeclaration : variableName (WS|NS)? COLON (WS|NS)? typeName;
 
-argumentDeclarations: argumentDeclaration (WSS? COMMA WSS? argumentDeclaration)*;
+argumentDeclarations: argumentDeclaration ((WS|NS)? COMMA (WS|NS)? argumentDeclaration)*;
 
-typeDeclaration : typeName (LBR argumentDeclarations RBR)? (WSS? COLON WSS? typeName)?;
+typeDeclaration : typeName (LBR argumentDeclarations RBR)? ((WS|NS)? COLON (WS|NS)? typeName)?;
 
 version: '@' INTEGER?;
 
@@ -55,23 +57,27 @@ queryProjection: '?' queryLimit? variableName?;
 argumentExpression
     : OMMIT
     | arithmeticExpression
-    | variableName WSS? '=' WSS? arithmeticExpression
+    | variableName (WS|NS)? '=' (WS|NS)? arithmeticExpression
     | evaluationExpression
-    | variableName WSS? '=' WSS? evaluationExpression
+    | variableName (WS|NS)? '=' (WS|NS)? evaluationExpression
     | queryProjection
     | variableName queryProjection
     | conditionExpression queryProjection?;
 
-argumentExpressions :  argumentExpression (WSS? COMMA WSS? argumentExpression)*;
+argumentExpressions :  argumentExpression ((WS|NS)? COMMA (WS|NS)? argumentExpression)*;
 
 queryExpression
     : baseQueryExpression queryProjection?
     | sliceExpression queryProjection?
     | chainedExpression queryProjection?
     | LBR queryExpression RBR queryProjection?
-    | NT queryExpression
+    | NOT queryExpression
     | queryExpression spacedLogicalOperator queryExpression
     ;
+
+newlineQueryExpression
+    : queryExpression
+    | queryExpression newlineLogicalOperator newlineQueryExpression;
 
 baseQueryExpression
     : arithmeticExpression
@@ -96,11 +102,11 @@ arithmeticExpression
 
 conditionExpression: arithmeticExpression spacedConditionOperator arithmeticExpression;
 
-sliceExpression: baseQueryExpression LSBR integer_c? WSS? COLON? WSS? integer_c? RSBR;
+sliceExpression: baseQueryExpression LSBR integer_c? (WS|NS)? COLON? (WS|NS)? integer_c? RSBR;
 
 chainedExpression
-    : baseQueryExpression WSS? DOT WSS? (variableName | evaluationExpression)
-    |<assoc=right> chainedExpression WSS? DOT WSS? (variableName | evaluationExpression)
+    : baseQueryExpression (WS|NS)? DOT (WS|NS)? (variableName | evaluationExpression)
+    |<assoc=right> chainedExpression (WS|NS)? DOT (WS|NS)? (variableName | evaluationExpression)
     ;
 
 constant
@@ -131,27 +137,30 @@ ommit:       OMMIT;
 
 logicalOperator: AND | OR | NOT | XOR | IMP | EQV;
 
-spacedLogicalOperator: WSS? logicalOperator WSS?;
+spacedLogicalOperator: WS? logicalOperator WS?;
+
+newlineLogicalOperator: NS logicalOperator WS?;
 
 conditionOperator: EQ | NE | IN | NIN | LT | LE | GT | GE | LIKE;
 
-spacedConditionOperator: WSS? conditionOperator WSS?;
+spacedConditionOperator: (WS|NS)? conditionOperator (WS|NS)?;
 
 arithmeticOperator: PLUS | MINUS | TIMES | DIVIDE | MOD | EXP;
 
-spacedArithmeticOperator: WSS? arithmeticOperator WSS?;
+spacedArithmeticOperator: (WS|NS)? arithmeticOperator (WS|NS)?;
 
-WSS: [ \t\u000C\r\n]+;
-NEWLINE: [\r\n]+;
+WS: [ \t\u000C]+ -> skip;
 
-LBR: '(' WSS?;
-RBR: WSS? ')';
+NS: [ \t\u000C]+ [\r\n] [ \t\u000C]* | [\r\n] [ \t\u000C]*;
 
-LCBR: '{' WSS?;
-RCBR: WSS? '}';
+LBR: '(' (WS|NS)?;
+RBR: (WS|NS)? ')';
 
-LSBR: '[' WSS?;
-RSBR: WSS? ']';
+LCBR: '{' (WS|NS)?;
+RCBR: (WS|NS)? '}';
+
+LSBR: '[' (WS|NS)?;
+RSBR: (WS|NS)? ']';
 
 NONE:      'none' | 'null' | 'na';
 AS:        'as';
@@ -194,16 +203,16 @@ UUID:      '$' STRING;
 URL:       'l' STRING;
 DATETIME:  't' STRING;
 
-SHOW: '%show' WSS?;
-UPDATE: '%update' WSS?;
-CREATE: '%create' WSS?;
-DELETE: '%delete' WSS?;
+SHOW: '%show' (WS|NS)?;
+UPDATE: '%update' (WS|NS)?;
+CREATE: '%create' (WS|NS)?;
+DELETE: '%delete' (WS|NS)?;
 
-KERAS_BLOCK : '{%keras' WSS?;
+KERAS_BLOCK : '{%keras' (WS|NS)?;
 
-PYTHON_BLOCK : '{%python' WSS?;
+PYTHON_BLOCK : '{%python' (WS|NS)?;
 
-SQL_BLOCK : '{%sql' WSS?;
+SQL_BLOCK : '{%sql' (WS|NS)?;
 
 BLOCK_END : '%}';
 

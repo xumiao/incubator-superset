@@ -152,6 +152,15 @@ class normListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by normParser#newlineQueryExpression.
+    def enterNewlineQueryExpression(self, ctx:normParser.NewlineQueryExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#newlineQueryExpression.
+    def exitNewlineQueryExpression(self, ctx:normParser.NewlineQueryExpressionContext):
+        pass
+
+
     # Enter a parse tree produced by normParser#baseQueryExpression.
     def enterBaseQueryExpression(self, ctx:normParser.BaseQueryExpressionContext):
         pass
@@ -347,6 +356,15 @@ class normListener(ParseTreeListener):
 
     # Exit a parse tree produced by normParser#spacedLogicalOperator.
     def exitSpacedLogicalOperator(self, ctx:normParser.SpacedLogicalOperatorContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#newlineLogicalOperator.
+    def enterNewlineLogicalOperator(self, ctx:normParser.NewlineLogicalOperatorContext):
+        pass
+
+    # Exit a parse tree produced by normParser#newlineLogicalOperator.
+    def exitNewlineLogicalOperator(self, ctx:normParser.NewlineLogicalOperatorContext):
         pass
 
 
