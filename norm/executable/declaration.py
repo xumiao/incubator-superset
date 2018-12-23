@@ -1,6 +1,9 @@
 from norm.executable import NormExecutable, NormError
 from norm.models import Lambda, Status
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class ArgumentDeclaration(NormExecutable):
 
@@ -16,13 +19,10 @@ class ArgumentDeclaration(NormExecutable):
         self.variable_name = variable_name
         self.variable_type = variable_type
 
-    def execute(self, session, context):
-        """
-        Create variables or retrieve variables
-        :rtype: superset.models.norm.Variable
-        """
+    def execute(self, context):
+        session = context.session
         # TODO: joinly search the type for the variable
-        lam = self.variable_type.execute(session, context)
+        lam = self.variable_type.execute(context)
         if lam is None:
             msg = "Type {} for variable {} has not been declared yet"\
                 .format(self.variable_type.name, self.variable_name)
@@ -55,7 +55,7 @@ class TypeDeclaration(NormExecutable):
         self.output_type_name = output_type_name
         self.description = None
 
-    def execute(self, session, context):
+    def execute(self, context):
         """
         Declare a type:
             * Create a type
@@ -65,11 +65,12 @@ class TypeDeclaration(NormExecutable):
         :return: the lambda
         :rtype: Lambda
         """
+        session = context.session
         # TODO: optimize to query db in batch for all types or utilize cache
-        variables = [var_declaration.execute(session, context) for var_declaration in
+        variables = [var_declaration.execute(context) for var_declaration in
                      reversed(self.argument_declarations)]
         self.type_name.namespace = context.context_namespace
-        lam = self.type_name.execute(session, context)  # type: Lambda
+        lam = self.type_name.execute(context)  # type: Lambda
         if lam is None:
             #  Create a new Lambda
             lam = Lambda(namespace=context.context_namespace, name=self.type_name.name)

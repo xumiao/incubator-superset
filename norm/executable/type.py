@@ -25,12 +25,13 @@ class TypeName(NormExecutable):
         s += '@' + str(self.version) if self.version is not None else ''
         return s
 
-    def execute(self, session, context):
+    def execute(self, context):
         """
         Retrieve the Lambda function by namespace, name, version.
         Note that user is encoded by the version.
         :rtype: Lambda
         """
+        session = context.session
         if self.namespace is None:
             lam = retrieve_type(context.context_namespace, self.name, self.version, session)
             if lam is None:
@@ -67,20 +68,20 @@ class ListType(NormExecutable):
         super().__init__()
         self.intern = intern
 
-    def execute(self, session, context):
+    def execute(self, context):
         """
         Return a list type
         :rtype: ListLambda
         """
-        lam = self.intern.execute(session, context)
+        lam = self.intern.execute(context)
         if lam.id is None:
             raise NormError("{} does not seem to be declared yet".format(self.intern))
 
-        q = session.query(ListLambda, Variable).join(ListLambda.variables)\
-                   .filter(Variable.type_id == lam.id)
+        q = context.session.query(ListLambda, Variable).join(ListLambda.variables)\
+                           .filter(Variable.type_id == lam.id)
         llam = q.scalar()
         if llam is None:
             # create a new ListLambda
             llam = ListLambda(lam)
-            session.add(llam)
+            context.session.add(llam)
         return llam

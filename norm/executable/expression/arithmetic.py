@@ -1,6 +1,6 @@
 import pandas as pd
 
-from norm.executable.expression.base import NormExpression
+from norm.executable.expression import NormExpression
 
 
 class ArithmeticExpr(NormExpression):
@@ -27,7 +27,7 @@ class ArithmeticExpr(NormExpression):
         self.expr2 = expr2
         self._projection = None
 
-    def execute(self, session, context):
+    def execute(self, context):
         # TODO
         if self.constant:
             try:

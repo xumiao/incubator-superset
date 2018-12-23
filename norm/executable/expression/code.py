@@ -1,4 +1,4 @@
-from norm.executable.expression.base import NormExpression
+from norm.executable.expression import NormExpression
 
 
 class CodeExpr(NormExpression):
@@ -14,8 +14,7 @@ class CodeExpr(NormExpression):
         super().__init__()
         self.mode = mode
         self.code = code
-        self._projection = None
 
-    def execute(self, session, context):
+    def execute(self, context):
         pass
 

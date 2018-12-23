@@ -143,30 +143,30 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#queryExpression.
-    def enterQueryExpression(self, ctx:normParser.QueryExpressionContext):
+    # Enter a parse tree produced by normParser#oneLineExpression.
+    def enterOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
         pass
 
-    # Exit a parse tree produced by normParser#queryExpression.
-    def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#newlineQueryExpression.
-    def enterNewlineQueryExpression(self, ctx:normParser.NewlineQueryExpressionContext):
-        pass
-
-    # Exit a parse tree produced by normParser#newlineQueryExpression.
-    def exitNewlineQueryExpression(self, ctx:normParser.NewlineQueryExpressionContext):
+    # Exit a parse tree produced by normParser#oneLineExpression.
+    def exitOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
         pass
 
 
-    # Enter a parse tree produced by normParser#baseQueryExpression.
-    def enterBaseQueryExpression(self, ctx:normParser.BaseQueryExpressionContext):
+    # Enter a parse tree produced by normParser#multiLineExpression.
+    def enterMultiLineExpression(self, ctx:normParser.MultiLineExpressionContext):
         pass
 
-    # Exit a parse tree produced by normParser#baseQueryExpression.
-    def exitBaseQueryExpression(self, ctx:normParser.BaseQueryExpressionContext):
+    # Exit a parse tree produced by normParser#multiLineExpression.
+    def exitMultiLineExpression(self, ctx:normParser.MultiLineExpressionContext):
+        pass
+
+
+    # Enter a parse tree produced by normParser#simpleExpression.
+    def enterSimpleExpression(self, ctx:normParser.SimpleExpressionContext):
+        pass
+
+    # Exit a parse tree produced by normParser#simpleExpression.
+    def exitSimpleExpression(self, ctx:normParser.SimpleExpressionContext):
         pass
 
 

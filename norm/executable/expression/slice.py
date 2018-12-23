@@ -1,5 +1,5 @@
 from norm.executable import NormExecutable
-from norm.executable.expression.base import NormExpression
+from norm.executable.expression import NormExpression
 
 
 class SliceExpr(NormExpression):
@@ -18,10 +18,9 @@ class SliceExpr(NormExpression):
         self.expr = expr
         self.start = start
         self.end = end
-        self._projection = None
 
-    def execute(self, session, context):
-        df = self.expr.execute(session, context)
+    def execute(self, context):
+        df = self.expr.execute(context)
         df = df.iloc[self.start:self.end]
         # TODO reset the index for the projected variable
         return df

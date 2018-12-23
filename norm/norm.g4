@@ -1,18 +1,16 @@
 grammar norm;
 
-script
-    : statement ((WS|NS)? statement)* (WS|NS)?
-    ;
+script: statement ((WS|NS)? statement)* (WS|NS)?;
 
 statement
     : comments SEMICOLON
     | comments? imports (WS|NS)? SEMICOLON
     | comments? exports (WS|NS)? SEMICOLON
     | comments? (WS|NS)? typeDeclaration (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? '=' (WS|NS)? newlineQueryExpression (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? OR '=' (WS|NS)? newlineQueryExpression (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? AND '=' (WS|NS)? newlineQueryExpression (WS|NS)? SEMICOLON
-    | comments? newlineQueryExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? '=' (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? OR '=' (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? AND '=' (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? multiLineExpression (WS|NS)? SEMICOLON
     ;
 
 SINGLELINE: '//' ~[\r\n]* [\r\n]*;
@@ -66,20 +64,20 @@ argumentExpression
 
 argumentExpressions :  argumentExpression ((WS|NS)? COMMA (WS|NS)? argumentExpression)*;
 
-queryExpression
-    : baseQueryExpression queryProjection?
+oneLineExpression
+    : simpleExpression queryProjection?
     | sliceExpression queryProjection?
     | chainedExpression queryProjection?
-    | LBR queryExpression RBR queryProjection?
-    | NOT queryExpression
-    | queryExpression spacedLogicalOperator queryExpression
+    | LBR oneLineExpression RBR queryProjection?
+    | NOT oneLineExpression
+    | oneLineExpression spacedLogicalOperator oneLineExpression
     ;
 
-newlineQueryExpression
-    : queryExpression
-    | queryExpression newlineLogicalOperator newlineQueryExpression;
+multiLineExpression
+    : oneLineExpression
+    | oneLineExpression newlineLogicalOperator multiLineExpression;
 
-baseQueryExpression
+simpleExpression
     : arithmeticExpression
     | evaluationExpression
     | codeExpression
@@ -102,10 +100,10 @@ arithmeticExpression
 
 conditionExpression: arithmeticExpression spacedConditionOperator arithmeticExpression;
 
-sliceExpression: baseQueryExpression LSBR integer_c? (WS|NS)? COLON? (WS|NS)? integer_c? RSBR;
+sliceExpression: simpleExpression LSBR integer_c? (WS|NS)? COLON? (WS|NS)? integer_c? RSBR;
 
 chainedExpression
-    : baseQueryExpression (WS|NS)? DOT (WS|NS)? (variableName | evaluationExpression)
+    : simpleExpression (WS|NS)? DOT (WS|NS)? (variableName | evaluationExpression)
     |<assoc=right> chainedExpression (WS|NS)? DOT (WS|NS)? (variableName | evaluationExpression)
     ;
 

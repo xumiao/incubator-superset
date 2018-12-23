@@ -1,11 +1,11 @@
-from norm.executable import NormExecutable
+from norm.executable.expression import NormExpression
 from norm.executable.expression.evaluation import EvaluationExpr
 from norm.literals import LOP
 
 import pandas as pd
 
 
-class QueryExpr(NormExecutable):
+class QueryExpr(NormExpression):
 
     def __init__(self, op, expr1, expr2, projection):
         """
@@ -13,9 +13,9 @@ class QueryExpr(NormExecutable):
         :param op: logical operation, e.g., [&, |, !, =>, <=>]
         :type op: LOP
         :param expr1: left expression
-        :type expr1: NormExecutable
+        :type expr1: NormExpression
         :param expr2: right expression
-        :type expr2: NormExecutable
+        :type expr2: NormExpression
         """
         super().__init__()
         self.op = op
@@ -23,13 +23,13 @@ class QueryExpr(NormExecutable):
         self.expr2 = expr2
         self.projection = projection
 
-    def execute(self, session, context):
+    def execute(self, context):
         df = None
         if self.op is None:
             self.expr1.projection = self.projection
-            df = self.expr1.execute(session, context)
+            df = self.expr1.execute(context)
         elif self.op == LOP.AND:
-            df = self.expr1.execute(session, context)
+            df = self.expr1.execute(context)
             if not df.empty:
                 pass
             if isinstance(self.expr2, EvaluationExpr):
@@ -44,6 +44,6 @@ class QueryExpr(NormExecutable):
                     var_name = self.expr2.projection.variable_name.name
                     df[var_name] = df[col].apply(extract)
                 else:
-                    df2 = self.expr2.execute(session, context)
+                    df2 = self.expr2.execute(context)
                     df = pd.concat([df, df2], axis=1)
         return df

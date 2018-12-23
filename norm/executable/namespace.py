@@ -29,17 +29,18 @@ class Import(NormExecutable):
         self.type_ = type_
         self.variable = variable
 
-    def execute(self, session, context):
+    def execute(self, context):
         """
         Imports follow the following logic:
             * imported namespace is stored in the context
             * imported type is cloned in the context namespace as a draft
             * imported type with alias is cloned and renamed in the context namespace as a draft
         """
+        session = context.session
         context.search_namespaces.add(self.namespace)
         if self.type_:
             self.type_.namespace = self.namespace
-            lam = self.type_.execute(session, context)
+            lam = self.type_.execute(context)
             if lam is None:
                 msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.namespace)
                 raise NormError(msg)
@@ -73,8 +74,9 @@ class Export(NormExecutable):
         self.type_ = type_
         self.alias = alias
 
-    def execute(self, session, context):
-        lam = self.type_.execute(session, context)
+    def execute(self, context):
+        session = context.session
+        lam = self.type_.execute(context)
         if lam is None:
             msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.type_.namespace)
             raise NormError(msg)

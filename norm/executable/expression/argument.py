@@ -1,4 +1,4 @@
-from norm.executable.expression.base import NormExpression
+from norm.executable.expression import NormExpression
 from norm.executable.expression.condition import ConditionExpr
 from norm.executable.expression.arithmetic import ArithmeticExpr
 
@@ -11,7 +11,7 @@ class ArgumentExpr(NormExpression):
         :param variable: the variable
         :type variable: VariableName
         :param expr: the expression
-        :type expr: Union[ConditionExpr, ArithmeticExpr]
+        :type expr: ConditionExpr or ArithmeticExpr
         :param projection: the projection
         :type projection: Projection
         """
@@ -24,7 +24,7 @@ class ArgumentExpr(NormExpression):
     def set_positional(self, var):
         self.positional_variable = var
 
-    def execute(self, session, context):
+    def execute(self, context):
         assignment = None
         condition = None
         projection = None
@@ -37,7 +37,7 @@ class ArgumentExpr(NormExpression):
             else:
                 self.variable = self.positional_variable
         if isinstance(self.expr, ArithmeticExpr):
-            assignment = (self.variable.name, self.expr.execute(session, context))
+            assignment = (self.variable.name, self.expr.execute(context))
         if self.projection is not None:
             projection = (self.variable.name, self.projection.variable_name.name)
         return assignment, condition, projection

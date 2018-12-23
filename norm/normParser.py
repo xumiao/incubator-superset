@@ -361,9 +361,9 @@ class normParser ( Parser ):
     RULE_queryProjection = 12
     RULE_argumentExpression = 13
     RULE_argumentExpressions = 14
-    RULE_queryExpression = 15
-    RULE_newlineQueryExpression = 16
-    RULE_baseQueryExpression = 17
+    RULE_oneLineExpression = 15
+    RULE_multiLineExpression = 16
+    RULE_simpleExpression = 17
     RULE_code = 18
     RULE_codeExpression = 19
     RULE_evaluationExpression = 20
@@ -395,7 +395,7 @@ class normParser ( Parser ):
                    "argumentDeclaration", "argumentDeclarations", "typeDeclaration", 
                    "version", "typeName", "variableName", "queryLimit", 
                    "queryProjection", "argumentExpression", "argumentExpressions", 
-                   "queryExpression", "newlineQueryExpression", "baseQueryExpression", 
+                   "oneLineExpression", "multiLineExpression", "simpleExpression", 
                    "code", "codeExpression", "evaluationExpression", "arithmeticExpression", 
                    "conditionExpression", "sliceExpression", "chainedExpression", 
                    "constant", "none", "bool_c", "integer_c", "float_c", 
@@ -611,8 +611,8 @@ class normParser ( Parser ):
             return self.getTypedRuleContext(normParser.TypeNameContext,0)
 
 
-        def newlineQueryExpression(self):
-            return self.getTypedRuleContext(normParser.NewlineQueryExpressionContext,0)
+        def multiLineExpression(self):
+            return self.getTypedRuleContext(normParser.MultiLineExpressionContext,0)
 
 
         def OR(self):
@@ -793,7 +793,7 @@ class normParser ( Parser ):
 
 
                 self.state = 145
-                self.newlineQueryExpression()
+                self.multiLineExpression()
                 self.state = 147
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -854,7 +854,7 @@ class normParser ( Parser ):
 
 
                 self.state = 163
-                self.newlineQueryExpression()
+                self.multiLineExpression()
                 self.state = 165
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -915,7 +915,7 @@ class normParser ( Parser ):
 
 
                 self.state = 181
-                self.newlineQueryExpression()
+                self.multiLineExpression()
                 self.state = 183
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -944,7 +944,7 @@ class normParser ( Parser ):
 
 
                 self.state = 190
-                self.newlineQueryExpression()
+                self.multiLineExpression()
                 self.state = 192
                 self._errHandler.sync(self)
                 _la = self._input.LA(1)
@@ -2223,14 +2223,14 @@ class normParser ( Parser ):
             self.exitRule()
         return localctx
 
-    class QueryExpressionContext(ParserRuleContext):
+    class OneLineExpressionContext(ParserRuleContext):
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def baseQueryExpression(self):
-            return self.getTypedRuleContext(normParser.BaseQueryExpressionContext,0)
+        def simpleExpression(self):
+            return self.getTypedRuleContext(normParser.SimpleExpressionContext,0)
 
 
         def queryProjection(self):
@@ -2248,11 +2248,11 @@ class normParser ( Parser ):
         def LBR(self):
             return self.getToken(normParser.LBR, 0)
 
-        def queryExpression(self, i:int=None):
+        def oneLineExpression(self, i:int=None):
             if i is None:
-                return self.getTypedRuleContexts(normParser.QueryExpressionContext)
+                return self.getTypedRuleContexts(normParser.OneLineExpressionContext)
             else:
-                return self.getTypedRuleContext(normParser.QueryExpressionContext,i)
+                return self.getTypedRuleContext(normParser.OneLineExpressionContext,i)
 
 
         def RBR(self):
@@ -2266,25 +2266,25 @@ class normParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return normParser.RULE_queryExpression
+            return normParser.RULE_oneLineExpression
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterQueryExpression" ):
-                listener.enterQueryExpression(self)
+            if hasattr( listener, "enterOneLineExpression" ):
+                listener.enterOneLineExpression(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitQueryExpression" ):
-                listener.exitQueryExpression(self)
+            if hasattr( listener, "exitOneLineExpression" ):
+                listener.exitOneLineExpression(self)
 
 
 
-    def queryExpression(self, _p:int=0):
+    def oneLineExpression(self, _p:int=0):
         _parentctx = self._ctx
         _parentState = self.state
-        localctx = normParser.QueryExpressionContext(self, self._ctx, _parentState)
+        localctx = normParser.OneLineExpressionContext(self, self._ctx, _parentState)
         _prevctx = localctx
         _startState = 30
-        self.enterRecursionRule(localctx, 30, self.RULE_queryExpression, _p)
+        self.enterRecursionRule(localctx, 30, self.RULE_oneLineExpression, _p)
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 404
@@ -2292,7 +2292,7 @@ class normParser ( Parser ):
             la_ = self._interp.adaptivePredict(self._input,65,self._ctx)
             if la_ == 1:
                 self.state = 384
-                self.baseQueryExpression()
+                self.simpleExpression()
                 self.state = 386
                 self._errHandler.sync(self)
                 la_ = self._interp.adaptivePredict(self._input,61,self._ctx)
@@ -2333,7 +2333,7 @@ class normParser ( Parser ):
                 self.state = 396
                 self.match(normParser.LBR)
                 self.state = 397
-                self.queryExpression(0)
+                self.oneLineExpression(0)
                 self.state = 398
                 self.match(normParser.RBR)
                 self.state = 400
@@ -2350,7 +2350,7 @@ class normParser ( Parser ):
                 self.state = 402
                 self.match(normParser.NOT)
                 self.state = 403
-                self.queryExpression(2)
+                self.oneLineExpression(2)
                 pass
 
 
@@ -2363,8 +2363,8 @@ class normParser ( Parser ):
                     if self._parseListeners is not None:
                         self.triggerExitRuleEvent()
                     _prevctx = localctx
-                    localctx = normParser.QueryExpressionContext(self, _parentctx, _parentState)
-                    self.pushNewRecursionContext(localctx, _startState, self.RULE_queryExpression)
+                    localctx = normParser.OneLineExpressionContext(self, _parentctx, _parentState)
+                    self.pushNewRecursionContext(localctx, _startState, self.RULE_oneLineExpression)
                     self.state = 406
                     if not self.precpred(self._ctx, 1):
                         from antlr4.error.Errors import FailedPredicateException
@@ -2372,7 +2372,7 @@ class normParser ( Parser ):
                     self.state = 407
                     self.spacedLogicalOperator()
                     self.state = 408
-                    self.queryExpression(2) 
+                    self.oneLineExpression(2) 
                 self.state = 414
                 self._errHandler.sync(self)
                 _alt = self._interp.adaptivePredict(self._input,66,self._ctx)
@@ -2385,42 +2385,42 @@ class normParser ( Parser ):
             self.unrollRecursionContexts(_parentctx)
         return localctx
 
-    class NewlineQueryExpressionContext(ParserRuleContext):
+    class MultiLineExpressionContext(ParserRuleContext):
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def queryExpression(self):
-            return self.getTypedRuleContext(normParser.QueryExpressionContext,0)
+        def oneLineExpression(self):
+            return self.getTypedRuleContext(normParser.OneLineExpressionContext,0)
 
 
         def newlineLogicalOperator(self):
             return self.getTypedRuleContext(normParser.NewlineLogicalOperatorContext,0)
 
 
-        def newlineQueryExpression(self):
-            return self.getTypedRuleContext(normParser.NewlineQueryExpressionContext,0)
+        def multiLineExpression(self):
+            return self.getTypedRuleContext(normParser.MultiLineExpressionContext,0)
 
 
         def getRuleIndex(self):
-            return normParser.RULE_newlineQueryExpression
+            return normParser.RULE_multiLineExpression
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterNewlineQueryExpression" ):
-                listener.enterNewlineQueryExpression(self)
+            if hasattr( listener, "enterMultiLineExpression" ):
+                listener.enterMultiLineExpression(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitNewlineQueryExpression" ):
-                listener.exitNewlineQueryExpression(self)
+            if hasattr( listener, "exitMultiLineExpression" ):
+                listener.exitMultiLineExpression(self)
 
 
 
 
-    def newlineQueryExpression(self):
+    def multiLineExpression(self):
 
-        localctx = normParser.NewlineQueryExpressionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 32, self.RULE_newlineQueryExpression)
+        localctx = normParser.MultiLineExpressionContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 32, self.RULE_multiLineExpression)
         try:
             self.state = 420
             self._errHandler.sync(self)
@@ -2428,17 +2428,17 @@ class normParser ( Parser ):
             if la_ == 1:
                 self.enterOuterAlt(localctx, 1)
                 self.state = 415
-                self.queryExpression(0)
+                self.oneLineExpression(0)
                 pass
 
             elif la_ == 2:
                 self.enterOuterAlt(localctx, 2)
                 self.state = 416
-                self.queryExpression(0)
+                self.oneLineExpression(0)
                 self.state = 417
                 self.newlineLogicalOperator()
                 self.state = 418
-                self.newlineQueryExpression()
+                self.multiLineExpression()
                 pass
 
 
@@ -2450,7 +2450,7 @@ class normParser ( Parser ):
             self.exitRule()
         return localctx
 
-    class BaseQueryExpressionContext(ParserRuleContext):
+    class SimpleExpressionContext(ParserRuleContext):
 
         def __init__(self, parser, parent:ParserRuleContext=None, invokingState:int=-1):
             super().__init__(parent, invokingState)
@@ -2473,23 +2473,23 @@ class normParser ( Parser ):
 
 
         def getRuleIndex(self):
-            return normParser.RULE_baseQueryExpression
+            return normParser.RULE_simpleExpression
 
         def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterBaseQueryExpression" ):
-                listener.enterBaseQueryExpression(self)
+            if hasattr( listener, "enterSimpleExpression" ):
+                listener.enterSimpleExpression(self)
 
         def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitBaseQueryExpression" ):
-                listener.exitBaseQueryExpression(self)
+            if hasattr( listener, "exitSimpleExpression" ):
+                listener.exitSimpleExpression(self)
 
 
 
 
-    def baseQueryExpression(self):
+    def simpleExpression(self):
 
-        localctx = normParser.BaseQueryExpressionContext(self, self._ctx, self.state)
-        self.enterRule(localctx, 34, self.RULE_baseQueryExpression)
+        localctx = normParser.SimpleExpressionContext(self, self._ctx, self.state)
+        self.enterRule(localctx, 34, self.RULE_simpleExpression)
         try:
             self.state = 426
             self._errHandler.sync(self)
@@ -2898,8 +2898,8 @@ class normParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def baseQueryExpression(self):
-            return self.getTypedRuleContext(normParser.BaseQueryExpressionContext,0)
+        def simpleExpression(self):
+            return self.getTypedRuleContext(normParser.SimpleExpressionContext,0)
 
 
         def LSBR(self):
@@ -2952,7 +2952,7 @@ class normParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 469
-            self.baseQueryExpression()
+            self.simpleExpression()
             self.state = 470
             self.match(normParser.LSBR)
             self.state = 472
@@ -3021,8 +3021,8 @@ class normParser ( Parser ):
             super().__init__(parent, invokingState)
             self.parser = parser
 
-        def baseQueryExpression(self):
-            return self.getTypedRuleContext(normParser.BaseQueryExpressionContext,0)
+        def simpleExpression(self):
+            return self.getTypedRuleContext(normParser.SimpleExpressionContext,0)
 
 
         def DOT(self):
@@ -3076,7 +3076,7 @@ class normParser ( Parser ):
         try:
             self.enterOuterAlt(localctx, 1)
             self.state = 489
-            self.baseQueryExpression()
+            self.simpleExpression()
             self.state = 491
             self._errHandler.sync(self)
             _la = self._input.LA(1)
@@ -4228,7 +4228,7 @@ class normParser ( Parser ):
         if self._predicates == None:
             self._predicates = dict()
         self._predicates[10] = self.variableName_sempred
-        self._predicates[15] = self.queryExpression_sempred
+        self._predicates[15] = self.oneLineExpression_sempred
         self._predicates[21] = self.arithmeticExpression_sempred
         self._predicates[24] = self.chainedExpression_sempred
         pred = self._predicates.get(ruleIndex, None)
@@ -4242,7 +4242,7 @@ class normParser ( Parser ):
                 return self.precpred(self._ctx, 1)
          
 
-    def queryExpression_sempred(self, localctx:QueryExpressionContext, predIndex:int):
+    def oneLineExpression_sempred(self, localctx:OneLineExpressionContext, predIndex:int):
             if predIndex == 1:
                 return self.precpred(self._ctx, 1)
          

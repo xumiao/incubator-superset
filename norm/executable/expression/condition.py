@@ -1,4 +1,4 @@
-from norm.executable.expression.base import NormExpression
+from norm.executable.expression import NormExpression
 
 
 class ConditionExpr(NormExpression):
@@ -17,8 +17,7 @@ class ConditionExpr(NormExpression):
         self.op = op
         self.lexpr = lexpr
         self.rexpr = rexpr
-        self._projection = None
 
-    def execute(self, session, context):
+    def execute(self, context):
         # TODO filtering the df by the condition
         pass

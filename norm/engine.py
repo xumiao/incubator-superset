@@ -86,13 +86,15 @@ class NormCompiler(normListener):
         tree = parser.script()
         walker.walk(self, tree)
         self.optimize()
+        assert(len(self.stack) == 1)  # Parsing finished completely
         return self.stack.pop()
 
     def execute(self, script):
         exe = self.compile(dedent(script))
         if isinstance(exe, NormExecutable):
-            return exe.execute(self.session, self)
+            return exe.execute(self)
         else:
+            # TODO: shouldn't be here
             return exe
 
     def exitStatement(self, ctx:normParser.StatementContext):
@@ -107,7 +109,7 @@ class NormCompiler(normListener):
             description = self.stack.pop() if ctx.comments() else ''
             type_declaration.description = description
             self.stack.append(type_declaration)
-        elif ctx.queryExpression():
+        elif ctx.multiLineExpression():
             query = self.stack.pop()
             description = self.stack.pop() if ctx.comments() else ''
             if ctx.typeName():
@@ -253,15 +255,23 @@ class NormCompiler(normListener):
                 if isinstance(ch, normParser.ArgumentExpressionContext)]
         self.stack.append(args)
 
-    def exitBaseQueryExpression(self, ctx:normParser.BaseQueryExpressionContext):
+    def exitSimpleExpression(self, ctx:normParser.SimpleExpressionContext):
         pass
 
-    def exitQueryExpression(self, ctx:normParser.QueryExpressionContext):
+    def exitMultiLineExpression(self, ctx:normParser.MultiLineExpressionContext):
+        expr2 = self.stack.pop() if ctx.newlineLogicalOperator() else None
+        expr1 = self.stack.pop()
+        op = None
+        if ctx.newlineLogicalOperator():
+            op = LOP(ctx.newlineLogicalOperator().logicalOperator().getText())
+        self.stack.append(QueryExpr(op, expr1, expr2, None))
+
+    def exitOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
         projection = self.stack.pop() if ctx.queryProjection() else None
         expr2 = self.stack.pop() if ctx.spacedLogicalOperator() else None
         expr1 = self.stack.pop()
         op = None
-        if ctx.NT():
+        if ctx.NOT():
             op = LOP.NOT
         elif ctx.spacedLogicalOperator():
             op = LOP(ctx.spacedLogicalOperator().logicalOperator().getText())

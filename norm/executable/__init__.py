@@ -36,9 +36,6 @@ class NormError(RuntimeError):
 
 
 class NormExecutable(object):
-    """
-    Execute Norm Command
-    """
 
     def __init__(self):
         """
@@ -58,15 +55,13 @@ class NormExecutable(object):
         """
         self._projection = value
 
-    def execute(self, session, context):
+    def execute(self, context):
         """
-        Execute the command with given session and user context
-        :param session: the session the command is executed against
-        :type session: sqlalchemy.orm.Session
+        Execute the command with given context
         :param context: the context of the executable
         :type context: norm.engine.NormCompiler
         :return: pandas.DataFrame
-        :type: pandas.DataFrame
+        :rtype: pandas.DataFrame
         """
         raise NotImplementedError()
 

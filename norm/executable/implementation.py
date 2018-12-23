@@ -24,7 +24,7 @@ class TypeImplementation(NormExecutable):
         self.query = query
         self.description = description
 
-    def execute(self, session, context):
+    def execute(self, context):
         """
         Three types of implementations
             * new implementation (=) implies an anchor version
@@ -32,6 +32,7 @@ class TypeImplementation(NormExecutable):
             * conjunctive implementation (&=)
             * disjunctive implementation (|=)
         """
+        session = context.session
         from norm.engine import ImplType
         lam = None
         if self.op == ImplType.ASS:

@@ -22,11 +22,5 @@ class VariableName(NormExecutable):
         else:
             return self.variable
 
-    def execute(self, session, context):
-        """
-
-        :param session:
-        :param context:
-        :return:
-        """
+    def execute(self, context):
         pass
