@@ -37,23 +37,13 @@ class NormError(RuntimeError):
 
 class NormExecutable(object):
 
-    def __init__(self):
+    def compile(self, context):
         """
-        Build an executable from the expression command
+        Compile the command with the given context
+        :param context: the context of the executable
+        :type context: norm.engine.NormCompiler
         """
-        self._projection = None  # type: Projection
-
-    @property
-    def projection(self):
-        return self._projection
-
-    @projection.setter
-    def projection(self, value):
-        """
-        :param value: set the projection
-        :type value: Projection
-        """
-        self._projection = value
+        raise NotImplementedError
 
     def execute(self, context):
         """

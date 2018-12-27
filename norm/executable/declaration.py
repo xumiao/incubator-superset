@@ -18,11 +18,13 @@ class ArgumentDeclaration(NormExecutable):
         super().__init__()
         self.variable_name = variable_name
         self.variable_type = variable_type
+        self.var = None
 
-    def execute(self, context):
+    def compile(self, context):
+        self.variable_type.compile(context)
         session = context.session
-        # TODO: joinly search the type for the variable
-        lam = self.variable_type.execute(context)
+        # TODO: jointly search the type for the variable
+        lam = self.variable_type.lam
         if lam is None:
             msg = "Type {} for variable {} has not been declared yet"\
                 .format(self.variable_type.name, self.variable_name)
@@ -34,7 +36,10 @@ class ArgumentDeclaration(NormExecutable):
         if var is None:
             var = Variable(self.variable_name.name, lam)
             session.add(var)
-        return var
+        self.var = var
+
+    def execute(self, context):
+        return self.var
 
 
 class TypeDeclaration(NormExecutable):
@@ -55,6 +60,11 @@ class TypeDeclaration(NormExecutable):
         self.output_type_name = output_type_name
         self.description = None
 
+    def compile(self, context):
+        self.type_name.compile(context)
+        for var_declaration in self.argument_declarations:
+            var_declaration.compile(context)
+
     def execute(self, context):
         """
         Declare a type:
@@ -65,7 +75,6 @@ class TypeDeclaration(NormExecutable):
         :return: the lambda
         :rtype: Lambda
         """
-        session = context.session
         # TODO: optimize to query db in batch for all types or utilize cache
         variables = [var_declaration.execute(context) for var_declaration in
                      reversed(self.argument_declarations)]
@@ -76,7 +85,7 @@ class TypeDeclaration(NormExecutable):
             lam = Lambda(namespace=context.context_namespace, name=self.type_name.name)
             lam.description = self.description
             lam.variables = variables
-            session.add(lam)
+            context.session.add(lam)
             return lam
         else:
             assert(lam.status == Status.DRAFT)

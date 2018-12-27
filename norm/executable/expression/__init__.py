@@ -6,7 +6,6 @@ class NormExpression(NormExecutable):
 
     def __init__(self):
         super().__init__()
-        self._query = ''
         self._projection = None  # type: Projection
 
     @property
@@ -21,13 +20,22 @@ class NormExpression(NormExecutable):
         """
         self._projection = value
 
-    @property
-    def query(self):
+    def serialize(self):
         """
-        Generate compiled query string
-        :return: str
+        Serialize the compiled expression to a query string template and a list of query variables
+        :return: Tuple[str, List[norm.models.norm.Variable]]
         """
-        return self._query
-
-    def execute(self, context):
         raise NotImplementedError
+
+
+def deserialize(query, variables):
+    """
+    De-serialize the query string template with given variables to a NormExpression
+    :param query: the query string with '{{ variable }}' as the template to refer to the Lambda
+    :type query: str
+    :param variables: a list of Variable (name, type) to be bound to the query
+    :type variables: List[norm.models.norm.Variable]
+    :return: the de-serialized expression
+    :rtype: NormExpression
+    """
+    raise NotImplementedError

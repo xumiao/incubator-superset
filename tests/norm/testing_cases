@@ -8,8 +8,8 @@ export test@3 norm.test;
 import norm.test.test@4 as tt;
 
 // Adding some data
-test =  'sfs' & 4
-     | ('fff' & 1)
+test = ('sfs', 4)
+     | ('fff', 1)
      ;
 test('aa', 6);
 // A new empty/default data
@@ -31,24 +31,20 @@ test &= utcnow()?t2; // automatically adding t2 as a Datetime type (inferred by 
 // Query the data
 test;
 test?;
-test(...);
-test(...)?;
-test('aa', ..., 6);
 test('aa', 6)?;
 test(a?);
 test(a?, b?);
 test(a=='sfs', b?);
-test(a?, b>2);
-test(a~'s', b>3?);
+test(a~'s'?, b>3?);
 
 // Define the probability distribution
 test &= gaussian(mu=2, gamma=0.1, b)?prob;
 
 // Sort on an attribute
-test.sort(by=t, ascending=False);
+test.sort(by='t', ascending=false);
 
-// Group by an attribute and taking the mean
-test.group(by=t).mean(on=[a, b]);
+// Group by an attribute and take the mean
+test.groupby('t').agg(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
 
 // Extract a pattern on an attribute
 test &= extract(a, r'sf')?sf;
@@ -67,16 +63,22 @@ test[3:7];
 test[:9];
 test[2:];
 test[:-2];
+test.groupby('a').b.mean[range(2,4)];
 
 // Chaining
-test.p.group(by=name);
+test.p.groupby('name');
+test.g.groupby('t').agg(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
 
 // Row-wise expansion with vectorized inputs
 // match(s:String, p:Pattern)
 // the following will cross product test with [r's', r'sf', r'aa']
-test &= match(test.a, [r's', r'sf', r'aa'])?matched;
+patterns = r's' or r'sf' or r'aa';
 
-// Column-wise expansion with list comprehension
-test &= [match(a, p)?_(v+p) for p in [r's', r'sf', r'aa']];
+// Higher order function ListLambda and column-wise expansion
+match(p=patterns)?matches              //ListLambda
+'pattern_{}'.format(patterns)?cols
+test &= matches(a).any?pa               Iterate on patterns with OR and project to column 'pa'
+test &= matches(a).all?_(cols)          Iterate on patterns with AND and project to columns
+                                            ('s', 'sf', 'aa')
 
 

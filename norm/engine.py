@@ -86,8 +86,10 @@ class NormCompiler(normListener):
         tree = parser.script()
         walker.walk(self, tree)
         self.optimize()
-        assert(len(self.stack) == 1)  # Parsing finished completely
-        return self.stack.pop()
+        assert(len(self.stack) == 1)  # Ensure that parsing has finished completely
+        exe = self.stack.pop()
+        exe.compile()
+        return exe
 
     def execute(self, script):
         exe = self.compile(dedent(script))

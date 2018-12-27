@@ -22,5 +22,8 @@ class VariableName(NormExecutable):
         else:
             return self.variable
 
+    def compile(self, context):
+        pass
+
     def execute(self, context):
         pass

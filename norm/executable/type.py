@@ -16,6 +16,7 @@ class TypeName(NormExecutable):
         self.namespace = None
         self.name = name
         self.version = version
+        self.lam = None
         assert(self.name is not None)
         assert(self.name != '')
 
@@ -25,7 +26,7 @@ class TypeName(NormExecutable):
         s += '@' + str(self.version) if self.version is not None else ''
         return s
 
-    def execute(self, context):
+    def compile(self, context):
         """
         Retrieve the Lambda function by namespace, name, version.
         Note that user is encoded by the version.
@@ -54,7 +55,10 @@ class TypeName(NormExecutable):
                     session.add(lam)
             else:
                 lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
-        return lam
+        self.lam = lam
+
+    def execute(self, context):
+        return self.lam
 
 
 class ListType(NormExecutable):
@@ -67,8 +71,9 @@ class ListType(NormExecutable):
         """
         super().__init__()
         self.intern = intern
+        self.llam = None
 
-    def execute(self, context):
+    def compile(self, context):
         """
         Return a list type
         :rtype: ListLambda
@@ -84,4 +89,8 @@ class ListType(NormExecutable):
             # create a new ListLambda
             llam = ListLambda(lam)
             context.session.add(llam)
-        return llam
+        self.llam = llam
+
+    def execute(self, context):
+        return self.llam
+

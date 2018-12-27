@@ -29,6 +29,12 @@ class Import(NormExecutable):
         self.type_ = type_
         self.variable = variable
 
+    def compile(self, context):
+        context.search_namespaces.add(self.namespace)
+        if self.type_:
+            self.type_.namespace = self.namespace
+            self.type_.compile(context)
+
     def execute(self, context):
         """
         Imports follow the following logic:
@@ -36,24 +42,21 @@ class Import(NormExecutable):
             * imported type is cloned in the context namespace as a draft
             * imported type with alias is cloned and renamed in the context namespace as a draft
         """
-        session = context.session
-        context.search_namespaces.add(self.namespace)
-        if self.type_:
-            self.type_.namespace = self.namespace
-            lam = self.type_.execute(context)
-            if lam is None:
-                msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.namespace)
-                raise NormError(msg)
-            if self.variable:
-                alias = lam.clone()
-                alias.namespace = context.context_namespace
-                alias.name = self.variable
-                session.add(alias)
-                return alias
-            else:
-                return lam
-        else:
+        if self.type_ is None:
             return self.namespace
+
+        lam = self.type_.lam
+        if lam is None:
+            msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.namespace)
+            raise NormError(msg)
+        if self.variable:
+            alias = lam.clone()
+            alias.namespace = context.context_namespace
+            alias.name = self.variable
+            context.session.add(alias)
+            return alias
+        else:
+            return lam
 
 
 class Export(NormExecutable):
@@ -74,12 +77,19 @@ class Export(NormExecutable):
         self.type_ = type_
         self.alias = alias
 
+    def compile(self, context):
+        self.type_.compile(context)
+
     def execute(self, context):
         session = context.session
-        lam = self.type_.execute(context)
+        lam = self.type_.lam
         if lam is None:
             msg = "Can not find the type {} in namespace {}".format(self.type_.name, self.type_.namespace)
             raise NormError(msg)
+        if lam.status != Status.DRAFT:
+            msg = 'Type {} is not in the draft status'
+            raise NormError(msg)
+
         if self.namespace is None or self.namespace.strip() == '':
             if lam.cloned_from:
                 lam.namespace = lam.cloned_from.namespace
@@ -87,6 +97,7 @@ class Export(NormExecutable):
                 lam.namespace = context.user_namespace
         else:
             lam.namespace = self.namespace
+
         old_lam_name = lam.name
         if self.alias:
             lam.name = self.alias
@@ -101,3 +112,4 @@ class Export(NormExecutable):
         session.add(new_lam)
         # TODO: possible cascaded exporting. the clone_from object might need to be exported too, or merge into one.
         return lam
+

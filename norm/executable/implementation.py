@@ -24,6 +24,9 @@ class TypeImplementation(NormExecutable):
         self.query = query
         self.description = description
 
+    def compile(self, context):
+        self.type_.compile(context)
+
     def execute(self, context):
         """
         Three types of implementations
@@ -36,7 +39,7 @@ class TypeImplementation(NormExecutable):
         from norm.engine import ImplType
         lam = None
         if self.op == ImplType.ASS:
-            lam = self.type_.execute(session, context)
+            lam = self.type_.lam
             if lam is None:
                 #  Create a new Lambda
                 lam = Lambda(namespace=context.context_namespace, name=self.type_.name)
