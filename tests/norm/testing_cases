@@ -35,16 +35,17 @@ test('aa', 6)?;
 test(a?);
 test(a?, b?);
 test(a=='sfs', b?);
+test(a='sfs', b?);
 test(a~'s'?, b>3?);
 
 // Define the probability distribution
 test &= gaussian(mu=2, gamma=0.1, b)?prob;
 
 // Sort on an attribute
-test.sort(by='t', ascending=false);
+test.sortby(t, ascending=false);
 
 // Group by an attribute and take the mean
-test.groupby('t').agg(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
+test.groupby(t).agg(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
 
 // Extract a pattern on an attribute
 test &= extract(a, r'sf')?sf;
@@ -66,19 +67,23 @@ test[:-2];
 test.groupby('a').b.mean[range(2,4)];
 
 // Chaining
-test.p.groupby('name');
-test.g.groupby('t').agg(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
+test.groupby('name').any;
+test.groupby('t').aggregate(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
 
 // Row-wise expansion with vectorized inputs
 // match(s:String, p:Pattern)
 // the following will cross product test with [r's', r'sf', r'aa']
-patterns = r's' or r'sf' or r'aa';
+patterns = [r's', r'sf', r'aa'];
 
-// Higher order function ListLambda and column-wise expansion
-match(p=patterns)?matches              //ListLambda
-'pattern_{}'.format(patterns)?cols
-test &= matches(a).any?pa               Iterate on patterns with OR and project to column 'pa'
-test &= matches(a).all?_(cols)          Iterate on patterns with AND and project to columns
-                                            ('s', 'sf', 'aa')
+// Higher order relation ListLambda and column-wise expansion
+  matches = match(p=patterns)           //ListLambda
+& cols = 'pattern_{}'.format(patterns)
+& matches(test.a).any?pa                //Iterate on patterns with OR and project to variable 'pa'
+& matches(test.a).all?_(cols);          //Iterate on patterns with AND and project to variables
+                                        //    ('pattern_s', 'pattern_sf', 'pattern_aa')
 
 
+// Inheritance
+animal(name: String, speak: String, numOfLegs: Integer);
+duck(name: String) = speak='guagua' & numOfLegs=2 & animal(name, speak, numOfLegs);
+frog(name: String) = speak='rubit' & numOfLegs=4 & animal(name, speak, numOfLegs);

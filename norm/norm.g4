@@ -46,9 +46,8 @@ typeName
 
 variableExpression
     : VARNAME
-    | '_' LBR variableExpression RBR
+    | '_'? LBR variableExpression (COMMA variableExpression)* RBR
     | VARNAME DOT variableExpression
-    | LBR variableExpression (COMMA variableExpression)* RBR
     ;
 
 queryLimit : INTEGER;
@@ -90,7 +89,7 @@ evaluationExpression
     : constant
     | codeExpression
     | VARNAME argumentExpressions?
-    | VARNAME argumentExpressions? (WS|NS)? DOT (WS|NS)? evaluationExpression
+    | evaluationExpression (WS|NS)? DOT (WS|NS)? evaluationExpression
     ;
 
 slicedExpression
@@ -116,6 +115,7 @@ conditionExpression
 oneLineExpression
     : conditionExpression queryProjection?
     | LBR oneLineExpression RBR queryProjection?
+    | variableExpression '=' oneLineExpression
     | NOT WS? oneLineExpression
     | oneLineExpression spacedLogicalOperator oneLineExpression
     ;
