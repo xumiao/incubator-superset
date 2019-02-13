@@ -3,16 +3,16 @@ from norm.literals import ConstantType
 
 class Projection(object):
 
-    def __init__(self, limit, variable_name):
+    def __init__(self, variables, to_evaluate=False):
         """
         The projection definition
-        :param limit: the limit of the query
-        :type limit: int
-        :param variable_name: the name of the variable to project to
-        :type variable_name: norm.executable.variable.VariableName
+        :param variables: a list of variables to project on
+        :type variables: List[norm.executable.variable.VariableName]
+        :param to_evaluate: whether to evaluate these variables or not, default to False.
+        :type to_evaluate: Boolean
         """
-        self.limit = limit
-        self.variable_name = variable_name
+        self.variables = variables
+        self.to_evaluate = to_evaluate
 
 
 class Constant(object):
@@ -29,6 +29,20 @@ class Constant(object):
         super().__init__()
         self.type_ = type_  # type: ConstantType
         self.value = value
+
+
+class ListConstant(Constant):
+
+    def __init__(self, type_, value):
+        """
+        A list of constant of the same constant type
+        :param type_: the name of the constant type
+        :type type_: ConstantType
+        :param value: the value of the constant
+        :type value: List
+        """
+        assert(isinstance(value, list))
+        super().__init__(type_, value)
 
 
 class NormError(RuntimeError):

@@ -5,13 +5,9 @@ from norm.executable.expression import NormExpression
 
 class ArithmeticExpr(NormExpression):
 
-    def __init__(self, constant, variable_name, op, expr1, expr2=None):
+    def __init__(self, op, expr1, expr2=None):
         """
         Arithmetic expression
-        :param constant: a constant
-        :type constant: Constant
-        :param variable_name: a variable
-        :type variable_name: VariableName
         :param op: the operation, e.g., [+, -, *, /, %, **]
         :type op: AOP
         :param expr1: left expression
@@ -20,8 +16,6 @@ class ArithmeticExpr(NormExpression):
         :type expr2: ArithmeticExpr
         """
         super().__init__()
-        self.constant = constant
-        self.variable_name = variable_name
         self.op = op
         self.expr1 = expr1
         self.expr2 = expr2

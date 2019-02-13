@@ -16,6 +16,7 @@ class AOP(Enum):
     MUL = '*'
     DIV = '/'
     MOD = '%'
+    EXP = '**'
 
 
 class COP(Enum):
@@ -26,6 +27,7 @@ class COP(Enum):
     EQ = '=='
     NE = '!='
     LK = '~'
+    IK = '~~'
     IN = 'in'
     NI = '!in'
 
@@ -38,20 +40,24 @@ class LOP(Enum):
     EQV = '<=>'
 
 
+class ROP(Enum):
+    ASS = '='
+
+
 class ConstantType(Enum):
     NULL = 'none'
     BOOL = 'bool'
     INT = 'integer'
     FLT = 'float'
     STR = 'string'
-    UNC = 'unicode'
     PTN = 'pattern'
     UID = 'uuid'
     URL = 'url'
     DTM = 'datetime'
+    ANY = 'object'
 
 
 class ImplType(Enum):
-    ASS = 'assign'
-    ORAS = 'or_assign'
-    ANDAS = 'and_assign'
+    DEF = 'def'
+    OR_DEF = 'or_def'
+    AND_DEF = 'and_def'

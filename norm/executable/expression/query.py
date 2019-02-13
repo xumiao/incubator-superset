@@ -1,5 +1,6 @@
-from norm.executable.expression import NormExpression
+from norm.executable.expression import NormExpression, Projection
 from norm.executable.expression.evaluation import EvaluationExpr
+from norm.executable.variable import VariableName
 from norm.literals import LOP
 
 import pandas as pd
@@ -7,7 +8,7 @@ import pandas as pd
 
 class QueryExpr(NormExpression):
 
-    def __init__(self, op, expr1, expr2, projection):
+    def __init__(self, op, expr1, expr2):
         """
         Query expression
         :param op: logical operation, e.g., [&, |, !, =>, <=>]
@@ -21,7 +22,6 @@ class QueryExpr(NormExpression):
         self.op = op
         self.expr1 = expr1
         self.expr2 = expr2
-        self.projection = projection
 
     def execute(self, context):
         df = None
@@ -47,3 +47,54 @@ class QueryExpr(NormExpression):
                     df2 = self.expr2.execute(context)
                     df = pd.concat([df, df2], axis=1)
         return df
+
+
+class NegatedQueryExpr(NormExpression):
+
+    def __init__(self, expr):
+        """
+        Negation of the expression
+        :param expr: the expression to negate
+        :type expr: NormExpression
+        """
+        super().__init__()
+        self.expr = expr
+
+    def execute(self, context):
+        raise NotImplementedError
+
+
+class ProjectedQueryExpr(NormExpression):
+
+    def __init__(self, expr, projection):
+        """
+        Project query expression
+        :param expr: the expression to project
+        :type expr: NormExpression
+        :param projection: the projection
+        :type projection: Projection
+        """
+        super().__init__()
+        self.expr = expr
+        self.projection = projection
+
+    def execute(self, context):
+        raise NotImplementedError
+
+
+class AssignedQueryExpr(NormExpression):
+
+    def __init__(self, expr, variable):
+        """
+        Assign query result to a variable
+        :param expr: the expression
+        :type expr: NormExpression
+        :param variable: the variable to be assigned to
+        :type variable: VariableName
+        """
+        super().__init__()
+        self.expr = expr
+        self.variable = variable
+
+    def execute(self, context):
+        raise NotImplementedError

@@ -8,9 +8,9 @@ export test@3 norm.test;
 import norm.test.test@4 as tt;
 
 // Adding some data
-test = ('sfs', 4)
-     | ('fff', 1)
-     ;
+test := ('sfs', 4)
+      | ('fff', 1)
+      ;
 test('aa', 6);
 // A new empty/default data
 test();
@@ -19,10 +19,10 @@ test();
 test &= (t:Datetime, p:Person);
 
 // Rename an attribute
-test.rename(a='b');
+test.rename('a', 'b');
 
 // Retype attributes and add another attribute
-test.astype(t=String, b=Integer);
+test.astype('t', String);
 
 // Add another attribute implicitly with values
 import python.datetime.datetime.utcnow;
@@ -42,10 +42,10 @@ test(a~'s'?, b>3?);
 test &= gaussian(mu=2, gamma=0.1, b)?prob;
 
 // Sort on an attribute
-test.sortby(t, ascending=false);
+test.t.desc;
 
 // Group by an attribute and take the mean
-test.groupby(t).agg(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
+test.foreach(t)?tt & tt.a.mean?a_mean & tt.a.max?a_max & tt.b.mean?b_mean;
 
 // Extract a pattern on an attribute
 test &= extract(a, r'sf')?sf;
@@ -64,26 +64,23 @@ test[3:7];
 test[:9];
 test[2:];
 test[:-2];
-test.groupby('a').b.mean[range(2,4)];
-
-// Chaining
-test.groupby('name').any;
-test.groupby('t').aggregate(a=['mean', 'max'], b=['mean'])?(a.mean, a.max, b.mean);
 
 // Row-wise expansion with vectorized inputs
 // match(s:String, p:Pattern)
 // the following will cross product test with [r's', r'sf', r'aa']
 patterns = [r's', r'sf', r'aa'];
 
-// Higher order relation ListLambda and column-wise expansion
-  matches = match(p=patterns)           //ListLambda
+// Higher order relation GroupLambda and column-wise expansion
+// Iterate on patterns with OR and project to variable 'pa'
+  matches = match.foreach(p=patterns)
 & cols = 'pattern_{}'.format(patterns)
-& matches(test.a).any?pa                //Iterate on patterns with OR and project to variable 'pa'
-& matches(test.a).all?_(cols);          //Iterate on patterns with AND and project to variables
-                                        //    ('pattern_s', 'pattern_sf', 'pattern_aa')
+& matches(test.a).any?pa;
+
+// Iterate on patterns with AND and project to variables  ('pattern_s', 'pattern_sf', 'pattern_aa')
+matches(test.a).all?{cols};
 
 
 // Inheritance
-animal(name: String, speak: String, numOfLegs: Integer);
-duck(name: String) = speak='guagua' & numOfLegs=2 & animal(name, speak, numOfLegs);
-frog(name: String) = speak='rubit' & numOfLegs=4 & animal(name, speak, numOfLegs);
+animal(name: String, speak: String, num_of_legs: Integer);
+duck(name: String) = speak='guagua' & num_of_legs=2 & animal(name, speak, numOfLegs);
+frog(name: String) = speak='rubit' & num_of_legs=4 & animal(name, speak, numOfLegs);

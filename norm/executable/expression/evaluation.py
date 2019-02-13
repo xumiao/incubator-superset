@@ -1,5 +1,6 @@
 from norm.executable import NormExecutable
 from norm.executable.expression.argument import ArgumentExpr
+from norm.executable.type import TypeName
 from norm.executable.variable import VariableName
 from norm.executable.expression import NormExpression
 
@@ -9,19 +10,32 @@ import pandas as pd
 
 class EvaluationExpr(NormExpression):
 
-    def __init__(self, type_name, args):
+    def __init__(self, variable, args):
         """
         The evaluation of an expression either led by a type name or a variable name
-        :param type_name: the type name or the variable name
-        :type type_name: TypeName
+        :param variable: the variable name to evaluate
+        :type variable: VariableName
         :param args: the arguments provided
         :type args: List[ArgumentExpr]
         """
         super().__init__()
-        self.type_name = type_name
+        self.variable = variable
         self.args = args
+        self.projections = None
+        self.filters = None
+        self.lam = None
+
+    def compile(self, context):
+        # compile the variable from context
+        self.lam = TypeName(self.variable.name).compile(context)
+        # compile the arguments
+
+        # TODO: might optimize the arguments
+        pass
 
     def execute(self, context):
+        # execute arguments
+        context.get_variable()
         lam = self.type_name.execute(context)
         if lam is None:
             raise RuntimeError('Given type {} is not found'.format(self.type_name))
@@ -55,7 +69,6 @@ class ChainedEvaluationExpr(NormExpression):
         super().__init__()
         self.lexpr = lexpr
         self.rexpr = rexpr
-        self._projection = None
 
     def execute(self, context):
         df = self.lexpr.execute(context)

@@ -456,7 +456,10 @@ class Lambda(Model, ParametrizedMixin):
             os.makedirs(self.folder)
         except OSError as e:
             if e.errno != errno.EEXIST:
-                raise
+                msg = 'Can not create the folder {}'.format(self.folder)
+                logger.error(msg)
+                logger.error(str(e))
+                raise e
 
     @property
     def _tensor_columns(self):
@@ -546,7 +549,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
-    def query(self, assignments=None, filters=None, projections=None):
+    def query(self, filters=None, projections=None):
         if projections is None:
             df = pd.read_parquet(self.data_file)
         else:
@@ -580,6 +583,27 @@ class Lambda(Model, ParametrizedMixin):
                     # TODO: Wrong
                     df = df[~df[pcol].isin(value.value)]
         return df
+
+
+class GroupLambda(Lambda):
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'lambda_group'
+    }
+
+    def all(self):
+        """
+        Combine the groups as columns
+        :return: Lambda
+        """
+        raise NotImplementedError
+
+    def any(self):
+        """
+        Combine the groups as concatenation
+        :return: Lambda
+        """
+        raise NotImplementedError
 
 
 class KerasLambda(Lambda):

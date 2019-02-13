@@ -7,7 +7,7 @@ from functools import lru_cache
 from textwrap import dedent
 
 from norm import config
-from norm.executable import Constant, Projection, NormExecutable
+from norm.executable import Constant, Projection, NormExecutable, ListConstant
 from norm.executable.declaration import *
 from norm.executable.expression.arithmetic import *
 from norm.executable.expression.code import *
@@ -18,7 +18,7 @@ from norm.executable.expression.slice import *
 from norm.executable.implementation import *
 from norm.executable.type import *
 from norm.executable.namespace import *
-from norm.literals import AOP, COP, LOP, ImplType, CodeMode, ConstantType, OMMIT
+from norm.literals import AOP, COP, LOP, ImplType, CodeMode, ConstantType, ROP
 from norm.utils import current_user
 from norm.normLexer import normLexer
 from norm.normListener import normListener
@@ -46,22 +46,34 @@ class NormCompiler(normListener):
 
     def __init__(self, context_id):
         # TODO: make sure the context can be save/load from cache
-        # context_id, namespaces should be able to be saved directly
-        # variable, stack and df should be reset
+        # context_id, user, namespaces should be able to be cached directly
+        # scope, stack and session should be reset
         self.context_id = context_id
+        self.scope = None
+        self.stack = []
+        self.session = None
+        self.user = None
+        self.context_namespace = None
+        self.user_namespace = None
+        self.search_namespaces = None
+        self.set_namespaces()
+
+    def set_namespaces(self):
         self.user = current_user()
-        self.context_namespace = '{}.{}'.format(config.CONTEXT_NAMESPACE_STUB, context_id)
+        self.context_namespace = '{}.{}'.format(config.CONTEXT_NAMESPACE_STUB, self.context_id)
         self.user_namespace = '{}.{}'.format(config.USER_NAMESPACE_STUB, self.user.username)
         from norm.models import NativeLambda
         self.search_namespaces = {NativeLambda.NAMESPACE, self.context_namespace, self.user_namespace}
-        self.stack = []
-        self.df = None
-        self.session = None
 
     def set_session(self, session):
+        """
+        Set the db session
+        :param session: the db session
+        :type session: sqlalchemy.session
+        """
         self.session = session
+        self.scope = None
         self.stack = []
-        self.df = None
 
     def optimize(self):
         """
@@ -88,7 +100,7 @@ class NormCompiler(normListener):
         self.optimize()
         assert(len(self.stack) == 1)  # Ensure that parsing has finished completely
         exe = self.stack.pop()
-        exe.compile()
+        exe.compile(self)
         return exe
 
     def execute(self, script):
@@ -100,34 +112,31 @@ class NormCompiler(normListener):
             return exe
 
     def exitStatement(self, ctx:normParser.StatementContext):
-        if ctx.imports():
-            # pass up
-            pass
-        elif ctx.exports():
-            # pass up
-            pass
-        elif ctx.typeDeclaration():
+        if ctx.typeDeclaration():
             type_declaration = self.stack.pop()
             description = self.stack.pop() if ctx.comments() else ''
             type_declaration.description = description
             self.stack.append(type_declaration)
-        elif ctx.multiLineExpression():
+        elif ctx.typeName():
             query = self.stack.pop()
+            type_name = self.stack.pop()
             description = self.stack.pop() if ctx.comments() else ''
-            if ctx.typeName():
-                if ctx.OR():
-                    op = ImplType.ORAS
-                elif ctx.AND():
-                    op = ImplType.ANDAS
-                else:
-                    op = ImplType.ASS
-                type_name = self.stack.pop()
-                self.stack.append(TypeImplementation(type_name, op, query, description))
+            if ctx.OR():
+                op = ImplType.OR_DEF
+            elif ctx.AND():
+                op = ImplType.AND_DEF
+            elif ctx.COLON():
+                op = ImplType.DEF
             else:
-                self.stack.append(query)
-        else:
-            # nothing to be parsed
-            pass
+                msg = 'Currently only support :=, |=, &= for implementation'
+                logger.error(msg)
+                raise NormError(msg)
+            self.stack.append(TypeImplementation(type_name, op, query, description))
+        elif ctx.imports() or ctx.exports() or ctx.multiLineExpression():
+            expr = self.stack.pop()
+            # ignore comments
+            self.stack.pop()
+            self.stack.append(expr)
 
     def exitNone(self, ctx:normParser.NoneContext):
         self.stack.append(Constant(ConstantType.NULL, None))
@@ -143,9 +152,6 @@ class NormCompiler(normListener):
 
     def exitString_c(self, ctx:normParser.String_cContext):
         self.stack.append(Constant(ConstantType.STR, str(ctx.getText()[1:-1])))
-
-    def exitUnicode_c(self, ctx:normParser.Unicode_cContext):
-        self.stack.append(Constant(ConstantType.UNC, str(ctx.getText()[2:-1]).encode(config.UNICODE, 'ignore')))
 
     def exitPattern(self, ctx:normParser.PatternContext):
         try:
@@ -163,20 +169,23 @@ class NormCompiler(normListener):
     def exitDatetime(self, ctx:normParser.DatetimeContext):
         self.stack.append(Constant(ConstantType.DTM, dateparser.parse(ctx.getText()[2:-1], fuzzy=True)))
 
-    def exitQueryLimit(self, ctx:normParser.QueryLimitContext):
-        lmt = ctx.getText()
-        try:
-            lmt = int(lmt)
-            if lmt < 0:
-                raise ParseError('Query limit must be positive integer, but we get {}'.format(lmt))
-        except:
-            raise ParseError('Query limit must be positive integer, but we get {}'.format(lmt))
-        self.stack.append(lmt)
+    def exitConstant(self, ctx:normParser.ConstantContext):
+        if ctx.LSBR():
+            constants = reversed([self.stack.pop() for ch in ctx.children
+                                  if isinstance(ch, normParser.ConstantContext)])
+            value = [constant.value for constant in constants]
+            types = set(constant.type_ for constant in constants)
+            if len(types) > 1:
+                type_ = ConstantType.ANY
+            else:
+                type_ = types.pop()
+            self.stack.append(ListConstant(type_, value))
 
     def exitQueryProjection(self, ctx:normParser.QueryProjectionContext):
-        variable = self.stack.pop() if ctx.variableName() else None
-        lmt = self.stack.pop() if ctx.queryLimit() else None
-        self.stack.append(Projection(lmt, variable))
+        variables = reversed([self.stack.pop() for ch in ctx.children
+                              if isinstance(ch, normParser.VariableContext)])
+        to_evaluate = True if ctx.LCBR() else False
+        self.stack.append(Projection(variables, to_evaluate))
 
     def exitComments(self, ctx:normParser.CommentsContext):
         spaces = ' \r\n\t'
@@ -184,7 +193,7 @@ class NormCompiler(normListener):
         if ctx.MULTILINE():
             cmt = cmt.strip(spaces)[2:-2].strip(spaces)
         elif ctx.SINGLELINE():
-            cmt = cmt.strip(spaces)[2:].strip(spaces)
+            cmt = '\n'.join(cmt_line.strip(spaces)[2:].strip(spaces) for cmt_line in cmt.split('\n'))
         self.stack.append(cmt)
 
     def exitImports(self, ctx:normParser.ImportsContext):
@@ -225,104 +234,105 @@ class NormCompiler(normListener):
         else:
             raise ParseError('Not a valid type name definition')
 
-    def exitVariableName(self, ctx:normParser.VariableNameContext):
-        attribute = ctx.VARNAME().getText()
-        variable = self.stack.pop() if ctx.variableName() else None
-        if variable is not None:
-            self.stack.append(VariableName(variable, attribute))
-        else:
-            self.stack.append(VariableName(attribute))
+    def exitVariable(self, ctx:normParser.VariableContext):
+        variable = ctx.VARNAME().getText()
+        attribute = self.stack.pop() if ctx.variable() else None
+        self.stack.append(VariableName(variable, attribute))
 
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
-        var = None
-        expr = None
-        projection = None
-        if ctx.OMMIT():
-            var = OMMIT
-        elif ctx.arithmeticExpression():
-            expr = self.stack.pop()
-            var = self.stack.pop() if ctx.variableName() else None
-        elif ctx.variableName() and ctx.queryProjection():
-            projection = self.stack.pop()
-            var = self.stack.pop()
-        elif ctx.conditionExpression():
-            projection = self.stack.pop() if ctx.queryProjection() else None
-            expr = self.stack.pop()
-        elif ctx.queryProjection():
-            projection = self.stack.pop()
-        self.stack.append(ArgumentExpr(var, expr, projection))
+        projection = self.stack.pop() if ctx.queryProjection() else None
+        expr = self.stack.pop() if ctx.arithmeticExpression() else None
+        if ctx.spacedConditionOperator()():
+            op = COP(ctx.spacedConditionOperator().conditionOperator().getText())
+        elif ctx.DEF():
+            op = ROP.ASS
+        else:
+            op = None
+        variable = self.stack.pop() if ctx.variable() else None
+        self.stack.append(ArgumentExpr(variable, op, expr, projection))
 
     def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
         args = [self.stack.pop() for ch in ctx.children
                 if isinstance(ch, normParser.ArgumentExpressionContext)]
         self.stack.append(args)
 
-    def exitSimpleExpression(self, ctx:normParser.SimpleExpressionContext):
-        pass
-
     def exitMultiLineExpression(self, ctx:normParser.MultiLineExpressionContext):
-        expr2 = self.stack.pop() if ctx.newlineLogicalOperator() else None
-        expr1 = self.stack.pop()
-        op = None
         if ctx.newlineLogicalOperator():
-            op = LOP(ctx.newlineLogicalOperator().logicalOperator().getText())
-        self.stack.append(QueryExpr(op, expr1, expr2, None))
-
-    def exitOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
-        projection = self.stack.pop() if ctx.queryProjection() else None
-        expr2 = self.stack.pop() if ctx.spacedLogicalOperator() else None
-        expr1 = self.stack.pop()
-        op = None
-        if ctx.NOT():
-            op = LOP.NOT
-        elif ctx.spacedLogicalOperator():
-            op = LOP(ctx.spacedLogicalOperator().logicalOperator().getText())
-        self.stack.append(QueryExpr(op, expr1, expr2, projection))
-
-    def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
-        args = self.stack.pop() if ctx.argumentExpressions() else []
-        type_name = self.stack.pop() if ctx.typeName() else None
-        if type_name is None:
-            raise ParseError('Evaluation expression at least starts with a type or a variable')
-        self.stack.append(EvaluationExpr(type_name, args))
-
-    def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
-        if ctx.LBR():
-            return
-        constant = self.stack.pop() if ctx.constant() else None
-        variable = self.stack.pop() if ctx.variableName() else None
-        if ctx.MINUS():
-            expr = self.stack.pop()
-            self.stack.append(ArithmeticExpr(constant, variable, AOP.SUB, expr))
-            return
-        if ctx.spacedArithmeticOperator():
             expr2 = self.stack.pop()
             expr1 = self.stack.pop()
-            aop = AOP(ctx.spacedArithmeticOperator().arithmeticOperator().getText())
-            self.stack.append(ArithmeticExpr(constant, variable, aop, expr1, expr2))
+            op = LOP(ctx.newlineLogicalOperator().logicalOperator().getText())
+            self.stack.append(QueryExpr(op, expr1, expr2))
+
+    def exitOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
+        if ctx.queryProjection():
+            projection = self.stack.pop()
+            expr = self.stack.pop()
+            self.stack.append(ProjectedQueryExpr(expr, projection))
+        elif ctx.DEF():
+            expr = self.stack.pop()
+            variable = self.stack.pop()
+            self.stack.append(AssignedQueryExpr(expr, variable))
+        elif ctx.NOT():
+            expr = self.stack.pop()
+            self.stack.append(NegatedQueryExpr(expr))
+        elif ctx.spacedLogicalOperator():
+            expr2 = self.stack.pop()
+            expr1 = self.stack.pop()
+            op = LOP(ctx.spacedLogicalOperator().logicalOperator().getText())
+            self.stack.append(QueryExpr(op, expr1, expr2))
 
     def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
-        qexpr = self.stack.pop() if ctx.arithmeticExpression(1) else None
-        aexpr = self.stack.pop()
-        cop = COP(ctx.spacedConditionOperator().conditionOperator().getText()) \
-            if ctx.spacedConditionOperator() else None
-        self.stack.append(ConditionExpr(cop, aexpr, qexpr))
+        if ctx.spacedConditionOperator():
+            qexpr = self.stack.pop()
+            aexpr = self.stack.pop()
+            cop = COP(ctx.spacedConditionOperator().conditionOperator().getText())
+            self.stack.append(ConditionExpr(cop, aexpr, qexpr))
 
-    def exitSliceExpression(self, ctx:normParser.SliceExpressionContext):
-        end = self.stack.pop().value if ctx.integer_c(1) else None
-        start = self.stack.pop().value if ctx.integer_c(0) else None
-        expr = self.stack.pop()
-        self.stack.append(SliceExpr(expr, start, end))
+    def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
+        if ctx.slicedExpression():
+            return
 
-    def exitChainedExpression(self, ctx:normParser.ChainedExpressionContext):
-        eexpr = self.stack.pop()
-        qexpr = self.stack.pop()
-        self.stack.append(ChainedEvaluationExpr(qexpr, eexpr))
+        expr2 = self.stack.pop()
+        op = None
+        if ctx.MOD():
+            op = AOP.MOD
+        elif ctx.EXP():
+            op = AOP.EXP
+        elif ctx.TIMES():
+            op = AOP.MUL
+        elif ctx.DIVIDE():
+            op = AOP.DIV
+        elif ctx.PLUS():
+            op = AOP.ADD
+        elif ctx.MINUS():
+            op = AOP.SUB
+        expr1 = self.stack.pop() if ctx.arithmeticExpression(1) else None
+        self.stack.append(ArithmeticExpr(op, expr1, expr2))
+
+    def exitSlicedExpression(self, ctx:normParser.SlicedExpressionContext):
+        if ctx.LSBR():
+            if ctx.evaluationExpression(1):
+                expr_range = self.stack.pop()
+                expr = self.stack.pop()
+                self.stack.append(EvaluatedSliceExpr(expr, expr_range))
+            else:
+                end = self.stack.pop().value if ctx.integer_c(1) else None
+                start = self.stack.pop().value if ctx.integer_c(0) else None
+                expr = self.stack.pop()
+                self.stack.append(SliceExpr(expr, start, end))
+
+    def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
+        if ctx.DOT():
+            rexpr = self.stack.pop()
+            lexpr = self.stack.pop()
+            self.stack.append(ChainedEvaluationExpr(lexpr, rexpr))
+        elif ctx.argumentExpressions():
+            args = self.stack.pop()
+            variable = self.stack.pop()
+            self.stack.append(EvaluationExpr(variable, args))
 
     def exitCodeExpression(self, ctx:normParser.CodeExpressionContext):
-        if ctx.KERAS_BLOCK():
-            self.stack.append(CodeExpr(CodeMode.KERAS, ctx.code().getText()))
-        elif ctx.PYTHON_BLOCK():
+        if ctx.PYTHON_BLOCK():
             self.stack.append(CodeExpr(CodeMode.PYTHON, ctx.code().getText()))
         elif ctx.SQL_BLOCK():
             self.stack.append(CodeExpr(CodeMode.SQL, ctx.code().getText()))

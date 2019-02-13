@@ -3,24 +3,19 @@ from norm.executable import NormExecutable
 
 class VariableName(NormExecutable):
 
-    def __init__(self, variable, attribute=None):
+    def __init__(self, name, attribute=None):
         """
         The variable and its recursive attributes
-        :param variable: the variable
-        :type variable: VariableName
-        :param attribute: the attribute of the variable
-        :type attribute: str
+        :param name: the variable name
+        :type name: str
+        :param attribute: the attribute of the variable, could be nested
+        :type attribute: VariableName
         """
         super().__init__()
-        self.variable = variable
-        self.attribute = attribute
-
-    @property
-    def name(self):
-        if isinstance(self.variable, VariableName):
-            return self.variable.name + '.' + self.attribute
+        if attribute is None:
+            self.name = name
         else:
-            return self.variable
+            self.name = name + '.' + attribute.name
 
     def compile(self, context):
         pass

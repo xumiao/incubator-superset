@@ -7,16 +7,16 @@ statement
     | comments? imports (WS|NS)? SEMICOLON
     | comments? exports (WS|NS)? SEMICOLON
     | comments? (WS|NS)? typeDeclaration (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? '=' (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? OR '=' (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? AND '=' (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? COLON DEF (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? OR DEF (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? AND DEF (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
     | comments? multiLineExpression (WS|NS)? SEMICOLON
     ;
 
 SINGLELINE: '//' ~[\r\n]* [\r\n]*;
 MULTILINE: '/*' (.)*? '*/' [\r\n]*;
 
-comments: MULTILINE | SINGLELINE;
+comments: MULTILINE | SINGLELINE (SINGLELINE)*;
 
 exports
     : SPACED_EXPORT typeName
@@ -44,23 +44,23 @@ typeName
     : VARNAME version?
     | LSBR typeName RSBR;
 
-variableExpression
+variable
     : VARNAME
-    | '_'? LBR variableExpression (COMMA variableExpression)* RBR
-    | VARNAME DOT variableExpression
+    | VARNAME DOT variable
     ;
 
-queryLimit : INTEGER;
-
-queryProjection : '?' queryLimit? variableExpression?;
+queryProjection
+    : '?' variable?
+    | '?' LCBR variable (COMMA variable)* RCBR
+    | '?' LBR variable (COMMA variable)* RBR
+    ;
 
 argumentExpression
     : arithmeticExpression
-    | VARNAME (WS|NS)? '=' (WS|NS)? arithmeticExpression
-    | VARNAME spacedConditionOperator arithmeticExpression
     | queryProjection
-    | VARNAME queryProjection
-    | argumentExpression queryProjection
+    | variable queryProjection
+    | variable WS? DEF WS? arithmeticExpression queryProjection?
+    | variable spacedConditionOperator arithmeticExpression queryProjection?
     ;
 
 argumentExpressions
@@ -88,7 +88,7 @@ codeExpression: (PYTHON_BLOCK|SQL_BLOCK) code BLOCK_END;
 evaluationExpression
     : constant
     | codeExpression
-    | VARNAME argumentExpressions?
+    | variable argumentExpressions?
     | evaluationExpression (WS|NS)? DOT (WS|NS)? evaluationExpression
     ;
 
@@ -115,7 +115,7 @@ conditionExpression
 oneLineExpression
     : conditionExpression queryProjection?
     | LBR oneLineExpression RBR queryProjection?
-    | variableExpression '=' oneLineExpression
+    | variable WS? DEF WS? oneLineExpression
     | NOT WS? oneLineExpression
     | oneLineExpression spacedLogicalOperator oneLineExpression
     ;
@@ -166,6 +166,8 @@ SEMICOLON: ';';
 COMMA:     ',';
 DOT:       '.';
 DOTDOT:    '..';
+DEF:       '=';
+
 
 IN:        'in';
 NIN:       '!in';
@@ -176,6 +178,7 @@ LE:        '<=';
 GT:        '>';
 LT:        '<';
 LIKE:      '~';
+ILIKE:     '~~';
 
 MINUS:     '-';
 PLUS:      '+';
@@ -184,11 +187,11 @@ DIVIDE:    '/';
 EXP:       '**';
 MOD:       '%';
 
-NOT:       '!' | 'not';
-AND:       '&' | 'and';
-OR:        '|' | 'or';
-XOR:       '^' | 'xor';
-IMP:       '=>' | 'imp';
+NOT:       '!'   | 'not';
+AND:       '&'   | 'and';
+OR:        '|'   | 'or' ;
+XOR:       '^'   | 'xor';
+IMP:       '=>'  | 'imp';
 EQV:       '<=>' | 'eqv';
 
 BOOLEAN:    'true' | 'false' | 'True' | 'False';
@@ -198,7 +201,7 @@ STRING:     '"' ( ~["\r\n\t] )*? '"' | '\'' ( ~['\r\n\t] )*? '\'' ;
 
 PATTERN:   'r' STRING;
 UUID:      '$' STRING;
-URL:       'l' STRING;
+URL:       'u' STRING;
 DATETIME:  't' STRING;
 
 SHOW: '%show' (WS|NS)?;

@@ -98,21 +98,12 @@ class normListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by normParser#variableExpression.
-    def enterVariableExpression(self, ctx:normParser.VariableExpressionContext):
+    # Enter a parse tree produced by normParser#variable.
+    def enterVariable(self, ctx:normParser.VariableContext):
         pass
 
-    # Exit a parse tree produced by normParser#variableExpression.
-    def exitVariableExpression(self, ctx:normParser.VariableExpressionContext):
-        pass
-
-
-    # Enter a parse tree produced by normParser#queryLimit.
-    def enterQueryLimit(self, ctx:normParser.QueryLimitContext):
-        pass
-
-    # Exit a parse tree produced by normParser#queryLimit.
-    def exitQueryLimit(self, ctx:normParser.QueryLimitContext):
+    # Exit a parse tree produced by normParser#variable.
+    def exitVariable(self, ctx:normParser.VariableContext):
         pass
 
 

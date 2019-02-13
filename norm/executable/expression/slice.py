@@ -24,3 +24,20 @@ class SliceExpr(NormExpression):
         df = df.iloc[self.start:self.end]
         # TODO reset the index for the projected variable
         return df
+
+
+class EvaluatedSliceExpr(SliceExpr):
+
+    def __init__(self, expr, expr_range):
+        """
+        Slice the expression with a range evaluation expression
+        :param expr: the expression to slice
+        :type expr: NormExpression
+        :param expr_range: the expression to evaluate
+        :type expr_range: NormExpression
+        """
+        super().__init__(expr, 0, -1)
+        self.expr_range = expr_range
+
+    def execute(self, context):
+        raise NotImplementedError
