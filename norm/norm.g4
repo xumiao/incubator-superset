@@ -7,9 +7,9 @@ statement
     | comments? imports (WS|NS)? SEMICOLON
     | comments? exports (WS|NS)? SEMICOLON
     | comments? (WS|NS)? typeDeclaration (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? COLON DEF (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? OR DEF (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
-    | comments? typeName (WS|NS)? AND DEF (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? COLON EQ (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? OR EQ (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? typeName (WS|NS)? AND EQ (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
     | comments? multiLineExpression (WS|NS)? SEMICOLON
     ;
 
@@ -23,14 +23,14 @@ exports
     | SPACED_EXPORT typeName (WS|NS)? VARNAME (DOT VARNAME)* ((WS|NS)? AS (WS|NS)? VARNAME)?
     ;
 
-SPACED_EXPORT: 'export' [ \t]*;
+SPACED_EXPORT: 'export'|'Export'|'EXPORT' [ \t]*;
 
 imports
     : SPACED_IMPORT VARNAME (DOT VARNAME)* DOT '*'
     | SPACED_IMPORT VARNAME (DOT VARNAME)* DOT typeName ((WS|NS)? AS (WS|NS)? VARNAME)?
     ;
 
-SPACED_IMPORT: 'import' [ \t]*;
+SPACED_IMPORT: 'import'|'Import'|'IMPORT' [ \t]*;
 
 argumentDeclaration : VARNAME (WS|NS)? COLON (WS|NS)? typeName;
 
@@ -59,7 +59,6 @@ argumentExpression
     : arithmeticExpression
     | queryProjection
     | variable queryProjection
-    | variable WS? DEF WS? arithmeticExpression queryProjection?
     | variable spacedConditionOperator arithmeticExpression queryProjection?
     ;
 
@@ -115,7 +114,6 @@ conditionExpression
 oneLineExpression
     : conditionExpression queryProjection?
     | LBR oneLineExpression RBR queryProjection?
-    | variable WS? DEF WS? oneLineExpression
     | NOT WS? oneLineExpression
     | oneLineExpression spacedLogicalOperator oneLineExpression
     ;
@@ -142,7 +140,7 @@ spacedLogicalOperator: WS? logicalOperator WS?;
 
 newlineLogicalOperator: NS logicalOperator WS?;
 
-conditionOperator: EQ | NE | IN | NIN | LT | LE | GT | GE | LIKE;
+conditionOperator: EQ | NE | IN | NI | LT | LE | GT | GE | LK;
 
 spacedConditionOperator: (WS|NS)? conditionOperator (WS|NS)?;
 
@@ -159,26 +157,23 @@ RCBR: (WS|NS)? '}';
 LSBR: '[' (WS|NS)?;
 RSBR: (WS|NS)? ']';
 
-NONE:      'none' | 'null' | 'na';
-AS:        'as';
+NONE:      'none' | 'null' | 'na' | 'None' | 'Null' | 'Na' | 'NONE' | 'NULL' | 'NA';
+AS:        'as' | 'As' | 'AS';
 COLON:     ':';
 SEMICOLON: ';';
 COMMA:     ',';
 DOT:       '.';
 DOTDOT:    '..';
-DEF:       '=';
 
-
-IN:        'in';
-NIN:       '!in';
-EQ:        '==';
+IN:        'in'  | 'IN'  | 'In';
+NI:        '!in' | '!IN' | '!In';
+EQ:        '=';
 NE:        '!=';
 GE:        '>=';
 LE:        '<=';
 GT:        '>';
 LT:        '<';
-LIKE:      '~';
-ILIKE:     '~~';
+LK:        '~';
 
 MINUS:     '-';
 PLUS:      '+';
@@ -187,14 +182,14 @@ DIVIDE:    '/';
 EXP:       '**';
 MOD:       '%';
 
-NOT:       '!'   | 'not';
-AND:       '&'   | 'and';
-OR:        '|'   | 'or' ;
-XOR:       '^'   | 'xor';
-IMP:       '=>'  | 'imp';
-EQV:       '<=>' | 'eqv';
+NOT:       '!'   | 'not' | 'Not' | 'NOT';
+AND:       '&'   | 'and' | 'And' | 'AND';
+OR:        '|'   | 'or'  | 'Or'  | 'OR';
+XOR:       '^'   | 'xor' | 'Xor' | 'XOR';
+IMP:       '=>'  | 'imp' | 'Imp' | 'IMP';
+EQV:       '<=>' | 'eqv' | 'Eqv' | 'EQV';
 
-BOOLEAN:    'true' | 'false' | 'True' | 'False';
+BOOLEAN:    'true' | 'false' | 'True' | 'False' | 'TRUE' | 'FALSE';
 INTEGER:    [+-]? DIGIT+;
 FLOAT:      [+-]? DIGIT+ DOT DIGIT+ ('e' [+-]? DIGIT+)?;
 STRING:     '"' ( ~["\r\n\t] )*? '"' | '\'' ( ~['\r\n\t] )*? '\'' ;

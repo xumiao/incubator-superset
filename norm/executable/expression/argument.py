@@ -5,8 +5,6 @@ from norm.executable.expression.arithmetic import ArithmeticExpr
 
 import logging
 
-from norm.literals import ROP
-
 logger = logging.getLogger(__name__)
 
 
@@ -19,8 +17,8 @@ class ArgumentExpr(NormExpression):
         :type variable: VariableName
         :param expr: the arithmetic expression for the variable
         :type expr: ArithmeticExpr
-        :param op: the operation, assignment or conditional
-        :type op: ROP or AOP
+        :param op: the conditional operation
+        :type op: COP
         :param projection: the projection
         :type projection: Projection
         """

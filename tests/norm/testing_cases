@@ -34,7 +34,6 @@ test?;
 test('aa', 6)?;
 test(a?);
 test(a?, b?);
-test(a=='sfs', b?);
 test(a='sfs', b?);
 test(a~'s'?, b>3?);
 

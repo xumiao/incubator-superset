@@ -18,7 +18,7 @@ from norm.executable.expression.slice import *
 from norm.executable.implementation import *
 from norm.executable.type import *
 from norm.executable.namespace import *
-from norm.literals import AOP, COP, LOP, ImplType, CodeMode, ConstantType, ROP
+from norm.literals import AOP, COP, LOP, ImplType, CodeMode, ConstantType
 from norm.utils import current_user
 from norm.normLexer import normLexer
 from norm.normListener import normListener
@@ -242,12 +242,8 @@ class NormCompiler(normListener):
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
         projection = self.stack.pop() if ctx.queryProjection() else None
         expr = self.stack.pop() if ctx.arithmeticExpression() else None
-        if ctx.spacedConditionOperator()():
-            op = COP(ctx.spacedConditionOperator().conditionOperator().getText())
-        elif ctx.DEF():
-            op = ROP.ASS
-        else:
-            op = None
+        op = COP(ctx.spacedConditionOperator().conditionOperator().getText().lower()) \
+            if ctx.spacedConditionOperator() else None
         variable = self.stack.pop() if ctx.variable() else None
         self.stack.append(ArgumentExpr(variable, op, expr, projection))
 
@@ -268,10 +264,6 @@ class NormCompiler(normListener):
             projection = self.stack.pop()
             expr = self.stack.pop()
             self.stack.append(ProjectedQueryExpr(expr, projection))
-        elif ctx.DEF():
-            expr = self.stack.pop()
-            variable = self.stack.pop()
-            self.stack.append(AssignedQueryExpr(expr, variable))
         elif ctx.NOT():
             expr = self.stack.pop()
             self.stack.append(NegatedQueryExpr(expr))
@@ -285,7 +277,7 @@ class NormCompiler(normListener):
         if ctx.spacedConditionOperator():
             qexpr = self.stack.pop()
             aexpr = self.stack.pop()
-            cop = COP(ctx.spacedConditionOperator().conditionOperator().getText())
+            cop = COP(ctx.spacedConditionOperator().conditionOperator().getText().lower())
             self.stack.append(ConditionExpr(cop, aexpr, qexpr))
 
     def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):

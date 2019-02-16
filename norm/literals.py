@@ -24,24 +24,20 @@ class COP(Enum):
     GE = '>='
     LT = '<'
     LE = '<='
-    EQ = '=='
+    EQ = '='
     NE = '!='
     LK = '~'
-    IK = '~~'
     IN = 'in'
     NI = '!in'
 
 
 class LOP(Enum):
-    AND = '&'
-    OR = '|'
-    NOT = '!'
-    IMP = '=>'
-    EQV = '<=>'
-
-
-class ROP(Enum):
-    ASS = '='
+    AND = 'and'
+    OR = 'or'
+    XOR = 'xor'
+    NOT = 'not'
+    IMP = 'imp'
+    EQV = 'eqv'
 
 
 class ConstantType(Enum):

@@ -28,8 +28,49 @@ class EvaluationExpr(NormExpression):
     def compile(self, context):
         # compile the variable from context
         self.lam = TypeName(self.variable.name).compile(context)
-        # compile the arguments
 
+        # compile the arguments
+        for i, arg in enumerate(self.args):  # type: ArgumentExpr
+            arg.projection
+            arg.set_positional(lam.variables[i])
+            assignment, condition, projection = arg.execute(context)
+            assignments.append(assignment)
+            conditions.append(condition)
+            projections.append(projection)
+
+        if projections is None:
+            df = pd.read_parquet(self.data_file)
+        else:
+            df = pd.read_parquet(self.data_file, columns=[col[0] for col in projections])
+            df = df.rename(columns=dict(projections))
+        if filters:
+            projections = dict(projections)
+            from norm.literals import COP
+            for col, op, value in filters:
+                pcol = projections.get(col, col)
+                df = df[df[pcol].notnull()]
+                if op == COP.LK:
+                    df = df[df[pcol].str.contains(value.value)]
+                elif op == COP.GT:
+                    df = df[df[pcol] > value.value]
+                elif op == COP.GE:
+                    df = df[df[pcol] >= value.value]
+                elif op == COP.LT:
+                    df = df[df[pcol] < value.value]
+                elif op == COP.LE:
+                    df = df[df[pcol] <= value.value]
+                elif op == COP.EQ:
+                    df = df[df[pcol] == value.value]
+                elif op == COP.NE:
+                    if value.value is not None:
+                        df = df[df[pcol] != value.value]
+                elif op == COP.IN:
+                    # TODO: Wrong
+                    df = df[df[pcol].isin(value.value)]
+                elif op == COP.NI:
+                    # TODO: Wrong
+                    df = df[~df[pcol].isin(value.value)]
+        return df
         # TODO: might optimize the arguments
         pass
 
