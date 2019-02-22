@@ -17,6 +17,12 @@ class VariableName(NormExecutable):
         else:
             self.name = name + '.' + attribute.name
 
+    def exists(self, context):
+        """
+        Check whether context contains the variable
+        """
+        pass
+
     def compile(self, context):
         pass
 

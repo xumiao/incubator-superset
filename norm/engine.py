@@ -1,4 +1,5 @@
 import re
+import uuid
 
 from antlr4 import *
 from antlr4.error.ErrorListener import ErrorListener
@@ -43,6 +44,7 @@ walker = ParseTreeWalker()
 
 
 class NormCompiler(normListener):
+    TMP_VARIABLE_STUB = 'tmp_'
 
     def __init__(self, context_id):
         # TODO: make sure the context can be save/load from cache
@@ -50,6 +52,7 @@ class NormCompiler(normListener):
         # scope, stack and session should be reset
         self.context_id = context_id
         self.scope = None
+        self.op = None
         self.stack = []
         self.session = None
         self.user = None
@@ -73,7 +76,16 @@ class NormCompiler(normListener):
         """
         self.session = session
         self.scope = None
+        self.op = None
         self.stack = []
+
+    def set_temp_scope(self):
+        """
+        For a unnamed query, we assign a temporary type for the scope.
+        For a named query, i.e., type implementation, the scope is the type.
+        :return:
+        """
+        self.scope = Lambda(self.context_namespace, self.TMP_VARIABLE_STUB + str(uuid.uuid4()))
 
     def optimize(self):
         """
@@ -173,7 +185,7 @@ class NormCompiler(normListener):
         if ctx.LSBR():
             constants = reversed([self.stack.pop() for ch in ctx.children
                                   if isinstance(ch, normParser.ConstantContext)])
-            value = [constant.value for constant in constants]
+            value = [constant for constant in constants]
             types = set(constant.type_ for constant in constants)
             if len(types) > 1:
                 type_ = ConstantType.ANY
@@ -185,6 +197,7 @@ class NormCompiler(normListener):
         variables = reversed([self.stack.pop() for ch in ctx.children
                               if isinstance(ch, normParser.VariableContext)])
         to_evaluate = True if ctx.LCBR() else False
+        # TODO: evaluate the variables to get the referred variables
         self.stack.append(Projection(variables, to_evaluate))
 
     def exitComments(self, ctx:normParser.CommentsContext):
@@ -256,7 +269,7 @@ class NormCompiler(normListener):
         if ctx.newlineLogicalOperator():
             expr2 = self.stack.pop()
             expr1 = self.stack.pop()
-            op = LOP(ctx.newlineLogicalOperator().logicalOperator().getText())
+            op = LOP.parse(ctx.newlineLogicalOperator().logicalOperator().getText())
             self.stack.append(QueryExpr(op, expr1, expr2))
 
     def exitOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
@@ -266,11 +279,12 @@ class NormCompiler(normListener):
             self.stack.append(ProjectedQueryExpr(expr, projection))
         elif ctx.NOT():
             expr = self.stack.pop()
+            # TODO: bring the negation logic here or delay to later?
             self.stack.append(NegatedQueryExpr(expr))
         elif ctx.spacedLogicalOperator():
             expr2 = self.stack.pop()
             expr1 = self.stack.pop()
-            op = LOP(ctx.spacedLogicalOperator().logicalOperator().getText())
+            op = LOP.parse(ctx.spacedLogicalOperator().logicalOperator().getText())
             self.stack.append(QueryExpr(op, expr1, expr2))
 
     def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
@@ -284,7 +298,6 @@ class NormCompiler(normListener):
         if ctx.slicedExpression():
             return
 
-        expr2 = self.stack.pop()
         op = None
         if ctx.MOD():
             op = AOP.MOD
@@ -298,6 +311,10 @@ class NormCompiler(normListener):
             op = AOP.ADD
         elif ctx.MINUS():
             op = AOP.SUB
+        if op is None:
+            return
+
+        expr2 = self.stack.pop()
         expr1 = self.stack.pop() if ctx.arithmeticExpression(1) else None
         self.stack.append(ArithmeticExpr(op, expr1, expr2))
 
@@ -320,7 +337,7 @@ class NormCompiler(normListener):
             self.stack.append(ChainedEvaluationExpr(lexpr, rexpr))
         elif ctx.argumentExpressions():
             args = self.stack.pop()
-            variable = self.stack.pop()
+            variable = self.stack.pop() if ctx.variable() else None
             self.stack.append(EvaluationExpr(variable, args))
 
     def exitCodeExpression(self, ctx:normParser.CodeExpressionContext):

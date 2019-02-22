@@ -87,7 +87,9 @@ codeExpression: (PYTHON_BLOCK|SQL_BLOCK) code BLOCK_END;
 evaluationExpression
     : constant
     | codeExpression
-    | variable argumentExpressions?
+    | variable
+    | argumentExpressions
+    | variable argumentExpressions
     | evaluationExpression (WS|NS)? DOT (WS|NS)? evaluationExpression
     ;
 
@@ -113,7 +115,6 @@ conditionExpression
 
 oneLineExpression
     : conditionExpression queryProjection?
-    | LBR oneLineExpression RBR queryProjection?
     | NOT WS? oneLineExpression
     | oneLineExpression spacedLogicalOperator oneLineExpression
     ;

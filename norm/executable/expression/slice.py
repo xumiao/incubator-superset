@@ -19,6 +19,13 @@ class SliceExpr(NormExpression):
         self.start = start
         self.end = end
 
+    def compile(self, context):
+        self.expr = self.expr.compile(context)
+        return self
+
+    def serialize(self):
+        pass
+
     def execute(self, context):
         df = self.expr.execute(context)
         df = df.iloc[self.start:self.end]

@@ -1,9 +1,9 @@
 from norm.executable.expression import NormExpression, Projection
-from norm.executable.expression.evaluation import EvaluationExpr
-from norm.executable.variable import VariableName
+from norm.executable.expression.condition import ConditionExpr, CombinedConditionExpr
 from norm.literals import LOP
 
-import pandas as pd
+import logging
+logger = logging.getLogger(__name__)
 
 
 class QueryExpr(NormExpression):
@@ -11,7 +11,7 @@ class QueryExpr(NormExpression):
     def __init__(self, op, expr1, expr2):
         """
         Query expression
-        :param op: logical operation, e.g., [&, |, !, =>, <=>]
+        :param op: logical operation, e.g., [&, |, ^, =>, <=>]
         :type op: LOP
         :param expr1: left expression
         :type expr1: NormExpression
@@ -23,30 +23,21 @@ class QueryExpr(NormExpression):
         self.expr1 = expr1
         self.expr2 = expr2
 
+    def compile(self, context):
+        self.expr1 = self.expr1.compile(context)
+        self.expr2 = self.expr2.compile(context)
+        if isinstance(self.expr1, ConditionExpr) and isinstance(self.expr2, ConditionExpr):
+            return CombinedConditionExpr(self.op, self.expr1, self.expr2)
+        return self
+
+    def serialize(self):
+        pass
+
     def execute(self, context):
-        df = None
-        if self.op is None:
-            self.expr1.projection = self.projection
-            df = self.expr1.execute(context)
-        elif self.op == LOP.AND:
-            df = self.expr1.execute(context)
-            if not df.empty:
-                pass
-            if isinstance(self.expr2, EvaluationExpr):
-                # TODO: move to natives
-                if self.expr2.name and self.expr2.name.name == 'Extract':
-                    col = self.expr2.args[1].expr.aexpr.name
-                    pt = self.expr2.args[0].expr.aexpr.value
-                    import re
-                    def extract(x):
-                        s = re.search(pt, x)
-                        return s.groups()[0] if s else None
-                    var_name = self.expr2.projection.variable_name.name
-                    df[var_name] = df[col].apply(extract)
-                else:
-                    df2 = self.expr2.execute(context)
-                    df = pd.concat([df, df2], axis=1)
-        return df
+        lam1 = self.expr1.execute(context)
+        lam2 = self.expr2.execute(context)
+        # TODO: AND to intersect, OR to union
+        return lam2
 
 
 class NegatedQueryExpr(NormExpression):
@@ -60,8 +51,24 @@ class NegatedQueryExpr(NormExpression):
         super().__init__()
         self.expr = expr
 
+    def compile(self, context):
+        if isinstance(self.expr, QueryExpr):
+            self.expr.expr1 = NegatedQueryExpr(self.expr.expr1).compile(context)
+            self.expr.expr2 = NegatedQueryExpr(self.expr.expr2).compile(context)
+            self.expr.op = self.expr.op.negate()
+        elif isinstance(self.expr, ConditionExpr):
+            self.expr.op = self.expr.op.negate()
+        else:
+            msg = 'Currently NOT only works on logically combined query or conditional query'
+            logger.error(msg)
+            raise NotImplementedError(msg)
+        return self.expr
+
+    def serialize(self):
+        pass
+
     def execute(self, context):
-        raise NotImplementedError
+        pass
 
 
 class ProjectedQueryExpr(NormExpression):
@@ -78,23 +85,13 @@ class ProjectedQueryExpr(NormExpression):
         self.expr = expr
         self.projection = projection
 
-    def execute(self, context):
-        raise NotImplementedError
+    def compile(self, context):
+        self.expr = self.expr.compile(context)
+        self.expr.projection = self.projection
+        return self.expr
 
-
-class AssignedQueryExpr(NormExpression):
-
-    def __init__(self, expr, variable):
-        """
-        Assign query result to a variable
-        :param expr: the expression
-        :type expr: NormExpression
-        :param variable: the variable to be assigned to
-        :type variable: VariableName
-        """
-        super().__init__()
-        self.expr = expr
-        self.variable = variable
+    def serialize(self):
+        pass
 
     def execute(self, context):
-        raise NotImplementedError
+        pass

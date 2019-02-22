@@ -213,6 +213,8 @@ class Lambda(Model, ParametrizedMixin):
                              params=self.params, variables=self.variables)
         lam.cloned_from = self
         lam.anchor = False
+        if self.df:
+            lam.df = self.df.copy(False)
         return lam
 
     def merge(self, others):
@@ -503,7 +505,7 @@ class Lambda(Model, ParametrizedMixin):
             logger.error(msg)
             raise RuntimeError(msg)
         else:
-            self.df = self.cloned_from._load_data()
+            self.df = self.cloned_from._load_data().copy(False)
 
         from norm.models.revision import DeltaRevision
         for i in range(self.current_revision + 1):
