@@ -1,5 +1,8 @@
 from norm.executable import NormExecutable, NormError
+from norm.executable.variable import VariableName
+from norm.executable.type import TypeName
 from norm.models import Lambda, Status
+from typing import List
 
 import logging
 logger = logging.getLogger(__name__)
@@ -21,7 +24,6 @@ class ArgumentDeclaration(NormExecutable):
         self.var = None
 
     def compile(self, context):
-        self.variable_type.compile(context)
         session = context.session
         # TODO: jointly search the type for the variable
         lam = self.variable_type.lam
@@ -37,9 +39,10 @@ class ArgumentDeclaration(NormExecutable):
             var = Variable(self.variable_name.name, lam)
             session.add(var)
         self.var = var
+        return self
 
     def execute(self, context):
-        return self.var
+        raise NotImplementedError
 
 
 class TypeDeclaration(NormExecutable):
@@ -58,14 +61,19 @@ class TypeDeclaration(NormExecutable):
         self.type_name = type_name
         self.argument_declarations = argument_declarations
         self.output_type_name = output_type_name
-        self.description = None
+        self._description = None
+        self.lam = None  # type: Lambda
+
+    @property
+    def description(self):
+        return self._description
+
+    @description.setter
+    def description(self, value):
+        self._description = value
+        self.lam.description = value
 
     def compile(self, context):
-        self.type_name.compile(context)
-        for var_declaration in self.argument_declarations:
-            var_declaration.compile(context)
-
-    def execute(self, context):
         """
         Declare a type:
             * Create a type
@@ -76,10 +84,9 @@ class TypeDeclaration(NormExecutable):
         :rtype: Lambda
         """
         # TODO: optimize to query db in batch for all types or utilize cache
-        variables = [var_declaration.execute(context) for var_declaration in
-                     reversed(self.argument_declarations)]
+        variables = [var_declaration.var for var_declaration in self.argument_declarations]
         self.type_name.namespace = context.context_namespace
-        lam = self.type_name.execute(context)  # type: Lambda
+        lam = self.type_name.lam  # type: Lambda
         if lam is None:
             #  Create a new Lambda
             lam = Lambda(namespace=context.context_namespace, name=self.type_name.name)
@@ -98,4 +105,9 @@ class TypeDeclaration(NormExecutable):
             # TODO: make a doc change revision
             if self.description:
                 lam.description = self.description
+        self.lam = lam
+        return self
+
+    def execute(self, context):
+        return self.lam
 

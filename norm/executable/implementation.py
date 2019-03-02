@@ -23,11 +23,9 @@ class TypeImplementation(NormExecutable):
         self.op = op
         self.query = query
         self.description = description
+        self.lam = None
 
     def compile(self, context):
-        self.type_.compile(context)
-
-    def execute(self, context):
         """
         Three types of implementations
             * new implementation (=) implies an anchor version
@@ -53,4 +51,8 @@ class TypeImplementation(NormExecutable):
         else:
             msg = 'Implementation only supports =, &=, |= for now'
             raise NormError(msg)
-        return lam
+        self.lam = lam
+        return self
+
+    def execute(self, context):
+        return self.lam

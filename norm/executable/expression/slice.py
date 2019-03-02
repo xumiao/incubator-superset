@@ -27,8 +27,8 @@ class SliceExpr(NormExpression):
         pass
 
     def execute(self, context):
-        df = self.expr.execute(context)
-        df = df.iloc[self.start:self.end]
+        lam = self.expr.execute(context)
+        df = lam.df.iloc[self.start:self.end]
         # TODO reset the index for the projected variable
         return df
 

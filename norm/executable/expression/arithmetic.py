@@ -1,8 +1,5 @@
-import pandas as pd
 from norm.literals import AOP
-
 from norm.executable import NormError
-
 from norm.executable.expression import NormExpression
 
 import logging
@@ -55,5 +52,3 @@ class ArithmeticExpr(NormExpression):
             # TODO: add a column to the schema?
             df = context.scope.df
             df[variable.name] = df.eval(self._exprstr)
-
-

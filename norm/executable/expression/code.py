@@ -15,6 +15,5 @@ class CodeExpr(NormExpression):
         self.mode = mode
         self.code = code
 
-    def execute(self, context):
+    def serialize(self):
         pass
-

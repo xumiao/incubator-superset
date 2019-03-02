@@ -6,6 +6,7 @@ from antlr4.error.ErrorListener import ErrorListener
 from dateutil import parser as dateparser
 from functools import lru_cache
 from textwrap import dedent
+from typing import List
 
 from norm import config
 from norm.executable import Constant, Projection, NormExecutable, ListConstant
@@ -87,14 +88,33 @@ class NormCompiler(normListener):
         """
         self.scope = Lambda(self.context_namespace, self.TMP_VARIABLE_STUB + str(uuid.uuid4()))
 
-    def optimize(self):
+    def _push(self, exe):
+        self._push(exe)
+
+    def _pop(self):
+        """
+        :rtype: NormExecutable
+        """
+        return self._pop()
+
+    def _peek(self):
+        """
+        :rtype: NormExecutable
+        """
+        return self.stack[-1]
+
+    def optimize(self, exe):
         """
         Optimize the AST to have a more efficient execution plan
-        # TODO
+        # TODO: optimization strategies
         * Filtering conditions can be combined and executed in batch instead of sequential
         * Arithmetic equations can be combined and passed to DF in batch instead of sequential
+        :param exe: the executable to be optimized
+        :type exe: NormExecutable
+        :return: the optimized executable
+        :rtype: NormExecutable
         """
-        pass
+        return exe
 
     def compile(self, script):
         if script is None or not isinstance(script, str):
@@ -109,11 +129,8 @@ class NormCompiler(normListener):
         parser.addErrorListener(NormErrorListener())
         tree = parser.script()
         walker.walk(self, tree)
-        self.optimize()
-        assert(len(self.stack) == 1)  # Ensure that parsing has finished completely
-        exe = self.stack.pop()
-        exe.compile(self)
-        return exe
+        assert(len(self.stack) == 1)  # Ensure that parsing and compilation has finished completely
+        return self.optimize(self._pop())
 
     def execute(self, script):
         exe = self.compile(dedent(script))
@@ -125,14 +142,14 @@ class NormCompiler(normListener):
 
     def exitStatement(self, ctx:normParser.StatementContext):
         if ctx.typeDeclaration():
-            type_declaration = self.stack.pop()
-            description = self.stack.pop() if ctx.comments() else ''
+            type_declaration = self._pop()
+            description = self._pop() if ctx.comments() else ''
             type_declaration.description = description
-            self.stack.append(type_declaration)
+            self._push(type_declaration)
         elif ctx.typeName():
-            query = self.stack.pop()
-            type_name = self.stack.pop()
-            description = self.stack.pop() if ctx.comments() else ''
+            query = self._pop()  # type: NormExpression
+            type_name = self._pop()
+            description = self._pop() if ctx.comments() else ''
             if ctx.OR():
                 op = ImplType.OR_DEF
             elif ctx.AND():
@@ -143,62 +160,61 @@ class NormCompiler(normListener):
                 msg = 'Currently only support :=, |=, &= for implementation'
                 logger.error(msg)
                 raise NormError(msg)
-            self.stack.append(TypeImplementation(type_name, op, query, description))
+            self._push(TypeImplementation(type_name, op, query, description).compile(self))
         elif ctx.imports() or ctx.exports() or ctx.multiLineExpression():
-            expr = self.stack.pop()
+            expr = self._pop()
             # ignore comments
-            self.stack.pop()
-            self.stack.append(expr)
+            self._pop()
+            self._push(expr)
 
     def exitNone(self, ctx:normParser.NoneContext):
-        self.stack.append(Constant(ConstantType.NULL, None))
+        self._push(Constant(ConstantType.NULL, None).compile(self))
 
     def exitBool_c(self, ctx:normParser.Bool_cContext):
-        self.stack.append(Constant(ConstantType.BOOL, ctx.getText().lower() == 'true'))
+        self._push(Constant(ConstantType.BOOL, ctx.getText().lower() == 'true').compile(self))
 
     def exitInteger_c(self, ctx:normParser.Integer_cContext):
-        self.stack.append(Constant(ConstantType.INT, int(ctx.getText())))
+        self._push(Constant(ConstantType.INT, int(ctx.getText())).compile(self))
 
     def exitFloat_c(self, ctx:normParser.Float_cContext):
-        self.stack.append(Constant(ConstantType.FLT, float(ctx.getText())))
+        self._push(Constant(ConstantType.FLT, float(ctx.getText())).compile(self))
 
     def exitString_c(self, ctx:normParser.String_cContext):
-        self.stack.append(Constant(ConstantType.STR, str(ctx.getText()[1:-1])))
+        self._push(Constant(ConstantType.STR, str(ctx.getText()[1:-1])).compile(self))
 
     def exitPattern(self, ctx:normParser.PatternContext):
         try:
-            self.stack.append(Constant(ConstantType.PTN, re.compile(str(ctx.getText()[2:-1]))))
+            self._push(Constant(ConstantType.PTN, re.compile(str(ctx.getText()[2:-1]))).compile(self))
         except:
             raise ParseError('Pattern constant {} is in wrong format, should be Python regex pattern'
                              .format(ctx.getText()))
 
     def exitUuid(self, ctx:normParser.UuidContext):
-        self.stack.append(Constant(ConstantType.UID, str(ctx.getText()[2:-1])))
+        self._push(Constant(ConstantType.UID, str(ctx.getText()[2:-1])).compile(self))
 
     def exitUrl(self, ctx:normParser.UrlContext):
-        self.stack.append(Constant(ConstantType.URL, str(ctx.getText()[2:-1])))
+        self._push(Constant(ConstantType.URL, str(ctx.getText()[2:-1])).compile(self))
 
     def exitDatetime(self, ctx:normParser.DatetimeContext):
-        self.stack.append(Constant(ConstantType.DTM, dateparser.parse(ctx.getText()[2:-1], fuzzy=True)))
+        self._push(Constant(ConstantType.DTM, dateparser.parse(ctx.getText()[2:-1], fuzzy=True)).compile(self))
 
     def exitConstant(self, ctx:normParser.ConstantContext):
         if ctx.LSBR():
-            constants = reversed([self.stack.pop() for ch in ctx.children
-                                  if isinstance(ch, normParser.ConstantContext)])
-            value = [constant for constant in constants]
+            constants = list(reversed([self._pop() for ch in ctx.children
+                                       if isinstance(ch, normParser.ConstantContext)]))  # type: List[Constant]
             types = set(constant.type_ for constant in constants)
             if len(types) > 1:
                 type_ = ConstantType.ANY
             else:
                 type_ = types.pop()
-            self.stack.append(ListConstant(type_, value))
+            self._push(ListConstant(type_, constants).compile(self))
 
     def exitQueryProjection(self, ctx:normParser.QueryProjectionContext):
-        variables = reversed([self.stack.pop() for ch in ctx.children
-                              if isinstance(ch, normParser.VariableContext)])
+        variables = list(reversed([self._pop() for ch in ctx.children
+                                   if isinstance(ch, normParser.VariableContext)]))
         to_evaluate = True if ctx.LCBR() else False
         # TODO: evaluate the variables to get the referred variables
-        self.stack.append(Projection(variables, to_evaluate))
+        self._push(Projection(variables, to_evaluate))
 
     def exitComments(self, ctx:normParser.CommentsContext):
         spaces = ' \r\n\t'
@@ -207,92 +223,92 @@ class NormCompiler(normListener):
             cmt = cmt.strip(spaces)[2:-2].strip(spaces)
         elif ctx.SINGLELINE():
             cmt = '\n'.join(cmt_line.strip(spaces)[2:].strip(spaces) for cmt_line in cmt.split('\n'))
-        self.stack.append(cmt)
+        self._push(cmt)
 
     def exitImports(self, ctx:normParser.ImportsContext):
-        type_ = self.stack.pop() if ctx.typeName() else None
+        type_ = self._pop() if ctx.typeName() else None   # type: TypeName
         namespace = [str(v) for v in ctx.VARNAME()]
         variable = namespace.pop() if ctx.AS() else None
-        self.stack.append(Import('.'.join(namespace), type_, variable))
+        self._push(Import('.'.join(namespace), type_, variable).compile(self))
 
     def exitExports(self, ctx:normParser.ExportsContext):
-        type_ = self.stack.pop()
+        type_ = self._pop()  # type: TypeName
         namespace = [str(v) for v in ctx.VARNAME()]
         variable = namespace.pop() if ctx.AS() else None
-        self.stack.append(Export('.'.join(namespace), type_, variable))
+        self._push(Export('.'.join(namespace), type_, variable).compile(self))
 
     def exitArgumentDeclaration(self, ctx:normParser.ArgumentDeclarationContext):
-        type_name = self.stack.pop()
-        variable_name = self.stack.pop()
-        self.stack.append(ArgumentDeclaration(variable_name, type_name))
+        type_name = self._pop()  # type: TypeName
+        variable_name = self._pop()  # type: VariableName
+        self._push(ArgumentDeclaration(variable_name, type_name).compile(self))
 
     def exitArgumentDeclarations(self, ctx:normParser.ArgumentDeclarationsContext):
-        args = reversed([self.stack.pop() for ch in ctx.children
-                         if isinstance(ch, normParser.ArgumentDeclarationContext)])
-        self.stack.append(list(args))
+        args = list(reversed([self._pop() for ch in ctx.children
+                             if isinstance(ch, normParser.ArgumentDeclarationContext)]))
+        self._push(args)
 
     def exitTypeDeclaration(self, ctx:normParser.TypeDeclarationContext):
-        output_type_name = self.stack.pop() if ctx.typeName(1) else None
-        args = self.stack.pop() if ctx.argumentDeclarations() else None
-        type_name = self.stack.pop()
-        self.stack.append(TypeDeclaration(type_name, args, output_type_name))
+        output_type_name = self._pop() if ctx.typeName(1) else None  # type: TypeName
+        args = self._pop() if ctx.argumentDeclarations() else None  # type: List[ArgumentDeclaration]
+        type_name = self._pop()  # type: TypeName
+        self._push(TypeDeclaration(type_name, args, output_type_name).compile(self))
 
     def exitTypeName(self, ctx:normParser.TypeNameContext):
         typename = ctx.VARNAME()
         if typename:
             version = int(ctx.version().getText()[1:]) if ctx.version() else None
-            self.stack.append(TypeName(str(typename), version))
+            self._push(TypeName(str(typename), version).compile(self))
         elif ctx.LSBR():
-            self.stack.append(ListType(self.stack.pop()))
+            intern = self._pop()  # type: TypeName
+            self._push(ListType(intern).compile(self))
         else:
             raise ParseError('Not a valid type name definition')
 
     def exitVariable(self, ctx:normParser.VariableContext):
         variable = ctx.VARNAME().getText()
-        attribute = self.stack.pop() if ctx.variable() else None
-        self.stack.append(VariableName(variable, attribute))
+        attribute = self._pop() if ctx.variable() else None  # type: VariableName
+        self._push(VariableName(variable, attribute).compile(self))
 
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
-        projection = self.stack.pop() if ctx.queryProjection() else None
-        expr = self.stack.pop() if ctx.arithmeticExpression() else None
+        projection = self._pop() if ctx.queryProjection() else None  # type: Projection
+        expr = self._pop() if ctx.arithmeticExpression() else None  # type: ArithmeticExpr
         op = COP(ctx.spacedConditionOperator().conditionOperator().getText().lower()) \
-            if ctx.spacedConditionOperator() else None
-        variable = self.stack.pop() if ctx.variable() else None
-        self.stack.append(ArgumentExpr(variable, op, expr, projection))
+            if ctx.spacedConditionOperator() else None  # type: COP
+        variable = self._pop() if ctx.variable() else None  # type: VariableName
+        self._push(ArgumentExpr(variable, op, expr, projection).compile(self))
 
     def exitArgumentExpressions(self, ctx:normParser.ArgumentExpressionsContext):
-        args = [self.stack.pop() for ch in ctx.children
-                if isinstance(ch, normParser.ArgumentExpressionContext)]
-        self.stack.append(args)
+        args = list(reversed([self._pop() for ch in ctx.children
+                             if isinstance(ch, normParser.ArgumentExpressionContext)]))
+        self._push(args)
 
     def exitMultiLineExpression(self, ctx:normParser.MultiLineExpressionContext):
         if ctx.newlineLogicalOperator():
-            expr2 = self.stack.pop()
-            expr1 = self.stack.pop()
+            expr2 = self._pop()  # type: NormExpression
+            expr1 = self._pop()  # type: NormExpression
             op = LOP.parse(ctx.newlineLogicalOperator().logicalOperator().getText())
-            self.stack.append(QueryExpr(op, expr1, expr2))
+            self._push(QueryExpr(op, expr1, expr2).compile(self))
 
     def exitOneLineExpression(self, ctx:normParser.OneLineExpressionContext):
         if ctx.queryProjection():
-            projection = self.stack.pop()
-            expr = self.stack.pop()
-            self.stack.append(ProjectedQueryExpr(expr, projection))
+            projection = self._pop()
+            expr = self._peek()
+            expr.projection = projection
         elif ctx.NOT():
-            expr = self.stack.pop()
-            # TODO: bring the negation logic here or delay to later?
-            self.stack.append(NegatedQueryExpr(expr))
+            expr = self._pop()  # type: NormExpression
+            self._push(NegatedQueryExpr(expr).compile(self))
         elif ctx.spacedLogicalOperator():
-            expr2 = self.stack.pop()
-            expr1 = self.stack.pop()
+            expr2 = self._pop()  # type: NormExpression
+            expr1 = self._pop()  # type: NormExpression
             op = LOP.parse(ctx.spacedLogicalOperator().logicalOperator().getText())
-            self.stack.append(QueryExpr(op, expr1, expr2))
+            self._push(QueryExpr(op, expr1, expr2).compile(self))
 
     def exitConditionExpression(self, ctx:normParser.ConditionExpressionContext):
         if ctx.spacedConditionOperator():
-            qexpr = self.stack.pop()
-            aexpr = self.stack.pop()
+            qexpr = self._pop()  # type: ArithmeticExpr
+            aexpr = self._pop()  # type: ArithmeticExpr
             cop = COP(ctx.spacedConditionOperator().conditionOperator().getText().lower())
-            self.stack.append(ConditionExpr(cop, aexpr, qexpr))
+            self._push(ConditionExpr(cop, aexpr, qexpr).compile(self))
 
     def exitArithmeticExpression(self, ctx:normParser.ArithmeticExpressionContext):
         if ctx.slicedExpression():
@@ -311,42 +327,41 @@ class NormCompiler(normListener):
             op = AOP.ADD
         elif ctx.MINUS():
             op = AOP.SUB
-        if op is None:
-            return
 
-        expr2 = self.stack.pop()
-        expr1 = self.stack.pop() if ctx.arithmeticExpression(1) else None
-        self.stack.append(ArithmeticExpr(op, expr1, expr2))
+        if op is not None:
+            expr2 = self._pop()  # type: ArithmeticExpr
+            expr1 = self._pop() if ctx.arithmeticExpression(1) else None  # type: ArithmeticExpr
+            self._push(ArithmeticExpr(op, expr1, expr2).compile(self))
 
     def exitSlicedExpression(self, ctx:normParser.SlicedExpressionContext):
         if ctx.LSBR():
             if ctx.evaluationExpression(1):
-                expr_range = self.stack.pop()
-                expr = self.stack.pop()
-                self.stack.append(EvaluatedSliceExpr(expr, expr_range))
+                expr_range = self._pop()  # type: NormExpression
+                expr = self._pop()  # type: NormExpression
+                self._push(EvaluatedSliceExpr(expr, expr_range).compile(self))
             else:
-                end = self.stack.pop().value if ctx.integer_c(1) else None
-                start = self.stack.pop().value if ctx.integer_c(0) else None
-                expr = self.stack.pop()
-                self.stack.append(SliceExpr(expr, start, end))
+                end = self._pop() if ctx.integer_c(1) else None  # type: Constant
+                start = self._pop() if ctx.integer_c(0) else None  # type: Constant
+                expr = self._pop()
+                self._push(SliceExpr(expr, start.value, end.value).compile(self))
 
     def exitEvaluationExpression(self, ctx:normParser.EvaluationExpressionContext):
         if ctx.DOT():
-            rexpr = self.stack.pop()
-            lexpr = self.stack.pop()
-            self.stack.append(ChainedEvaluationExpr(lexpr, rexpr))
+            rexpr = self._pop()
+            lexpr = self._pop()
+            self._push(ChainedEvaluationExpr(lexpr, rexpr).compile(self))
         elif ctx.argumentExpressions():
-            args = self.stack.pop()
-            variable = self.stack.pop() if ctx.variable() else None
-            self.stack.append(EvaluationExpr(variable, args))
+            args = self._pop()  # type: List[ArgumentExpr]
+            variable = self._pop() if ctx.variable() else None  # type: VariableName
+            self._push(EvaluationExpr(args, variable).compile(self))
 
     def exitCodeExpression(self, ctx:normParser.CodeExpressionContext):
         if ctx.PYTHON_BLOCK():
-            self.stack.append(CodeExpr(CodeMode.PYTHON, ctx.code().getText()))
+            self._push(CodeExpr(CodeMode.PYTHON, ctx.code().getText()).compile(self))
         elif ctx.SQL_BLOCK():
-            self.stack.append(CodeExpr(CodeMode.SQL, ctx.code().getText()))
+            self._push(CodeExpr(CodeMode.SQL, ctx.code().getText()).compile(self))
         else:
-            self.stack.append(CodeExpr(CodeMode.QUERY, ctx.code().getText()))
+            self._push(CodeExpr(CodeMode.QUERY, ctx.code().getText()).compile(self))
 
 
 @lru_cache(maxsize=128)

@@ -12,8 +12,10 @@ class NormExecutable(object):
         Compile the command with the given context
         :param context: the context of the executable
         :type context: norm.engine.NormCompiler
+        :return: An NormExecutable
+        :rtype: NormExecutable
         """
-        raise NotImplementedError
+        return self
 
     def execute(self, context):
         """
@@ -23,10 +25,10 @@ class NormExecutable(object):
         :return: the Lambda to be returned
         :rtype: norm.models.norm.Lambda
         """
-        raise NotImplementedError()
+        return None
 
 
-class Projection(object):
+class Projection(NormExecutable):
 
     def __init__(self, variables, to_evaluate=False):
         """
@@ -36,6 +38,7 @@ class Projection(object):
         :param to_evaluate: whether to evaluate these variables or not, default to False.
         :type to_evaluate: Boolean
         """
+        super().__init__()
         self.variables = variables
         self.to_evaluate = to_evaluate
 
@@ -43,7 +46,7 @@ class Projection(object):
         return len(self.variables)
 
 
-class Constant(object):
+class Constant(NormExecutable):
 
     def __init__(self, type_, value):
         """

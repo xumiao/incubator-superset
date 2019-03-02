@@ -98,6 +98,53 @@ def default_version(context):
     return new_version(namespace, name)
 
 
+def _check_draft_status(func):
+    """
+    A decorator to check whether the current Lambda is in draft status
+    :param func: a function to wrap
+    :type func: Callable
+    :return: a wrapped function
+    :rtype: Callable
+    """
+    def wrapper(self, *args, **kwargs):
+        if self.status != Status.DRAFT:
+            msg = '{} is not in Draft status. Please clone first to modify'.format(self)
+            logger.error(msg)
+            raise RuntimeError(msg)
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def _only_queryable(func):
+    """
+    A decorator to bypass the function if the current Lambda is below queryable
+    :param func: a function to wrap
+    :type func: Callable
+    :return: a wrapped function
+    :rtype: Callable
+    """
+    def wrapper(self, *args, **kwargs):
+        if self.level < Level.QUERYABLE:
+            return
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
+def _only_adaptable(func):
+    """
+    A decorator to bypass the function if the current Lambda is below adaptable
+    :param func: a function to wrap
+    :type func: Callable
+    :return: a wrapped function
+    :rtype: Callable
+    """
+    def wrapper(self, *args, **kwargs):
+        if self.level < Level.ADAPTABLE:
+            return
+        return func(self, *args, **kwargs)
+    return wrapper
+
+
 class Lambda(Model, ParametrizedMixin):
     """Lambda model is a function"""
     __tablename__ = 'lambdas'
@@ -176,7 +223,7 @@ class Lambda(Model, ParametrizedMixin):
         self.shape = shape or [100]
         self.anchor = True
         self.level = Level.COMPUTABLE
-        self.df = None
+        self.df = None  # type: DataFrame
 
     @orm.reconstructor
     def init_on_load(self):
@@ -202,6 +249,16 @@ class Lambda(Model, ParametrizedMixin):
             return '@'.join((self.namespace + '.' + self.name, str(self.version)))
         else:
             return '@'.join((self.name, str(self.version)))
+
+    def has_variable(self, variable_name):
+        """
+        Check whether the given variable name exists in the variable list
+        :param variable_name: the name of the variable
+        :type variable_name: str
+        :return: True or False
+        :rtype: bool
+        """
+        return variable_name in self._all_columns
 
     def clone(self):
         """
@@ -242,50 +299,6 @@ class Lambda(Model, ParametrizedMixin):
         :return:
         """
         raise NotImplementedError
-
-    def _check_draft_status(func):
-        """
-        A decorator to check whether the current Lambda is in draft status
-        :param func: a function to wrap
-        :type func: Callable
-        :return: a wrapped function
-        :rtype: Callable
-        """
-        def wrapper(self, *args, **kwargs):
-            if self.status != Status.DRAFT:
-                msg = '{} is not in Draft status. Please clone first to modify'.format(self)
-                logger.error(msg)
-                raise RuntimeError(msg)
-            return func(self, *args, **kwargs)
-        return wrapper
-
-    def _only_queryable(func):
-        """
-        A decorator to bypass the function if the current Lambda is below queryable
-        :param func: a function to wrap
-        :type func: Callable
-        :return: a wrapped function
-        :rtype: Callable
-        """
-        def wrapper(self, *args, **kwargs):
-            if self.level < Level.QUERYABLE:
-                return
-            return func(self, *args, **kwargs)
-        return wrapper
-
-    def _only_adaptable(func):
-        """
-        A decorator to bypass the function if the current Lambda is below adaptable
-        :param func: a function to wrap
-        :type func: Callable
-        :return: a wrapped function
-        :rtype: Callable
-        """
-        def wrapper(self, *args, **kwargs):
-            if self.level < Level.ADAPTABLE:
-                return
-            return func(self, *args, **kwargs)
-        return wrapper
 
     @_check_draft_status
     def conjunction(self):
@@ -551,7 +564,9 @@ class Lambda(Model, ParametrizedMixin):
         """
         raise NotImplementedError
 
-    def query(self, filters=None, projections=None):
+    def query(self, inputs, outputs):
+        filters = None
+        projections = None
         if projections is None:
             df = pd.read_parquet(self.data_file)
         else:

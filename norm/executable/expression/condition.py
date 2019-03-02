@@ -1,9 +1,12 @@
 from norm.executable import NormError, Constant
-from norm.literals import COP, ConstantType
+from norm.literals import COP, ConstantType, LOP
 
 from norm.executable.expression import NormExpression
+from norm.executable.expression.arithmetic import ArithmeticExpr
 from norm.executable.expression.assignment import AssignmentExpr
 from norm.executable.variable import VariableName
+
+from typing import Union
 
 import logging
 logger = logging.getLogger(__name__)
@@ -15,11 +18,11 @@ class ConditionExpr(NormExpression):
         """
         Condition expression
         :param op: conditional operation, e.g., [<, <=, >, >=, =, !=, in, !in, ~]. ~ means 'like'
-        :type op: COP
+        :type op: Union[COP, LOP]
         :param lexpr: arithmetic expression, e.g., a + b - c
-        :type lexpr: ArithmeticExpr
+        :type lexpr: Union[ArithmeticExpr, ConditionExpr]
         :param rexpr: another arithmetic expression
-        :type rexpr: ArithmeticExpr
+        :type rexpr: Union[ArithmeticExpr, ConditionExpr]
         """
         super().__init__()
         self.op = op

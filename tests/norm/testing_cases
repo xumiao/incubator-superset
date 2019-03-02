@@ -45,7 +45,7 @@ test &= view(p, time<t, page?);
 test.t.desc;
 
 // Group by an attribute and take the mean
-test.foreach(t)?tt & tt.a.mean?a_mean & tt.a.max?a_max & tt.b.mean?b_mean;
+tt = test.foreach(t) & tt.a.mean?a_mean & tt.a.max?a_max & tt.b.mean?b_mean;
 
 // Extract a pattern on an attribute
 test &= extract(a, r'sf')?sf;

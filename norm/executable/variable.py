@@ -16,15 +16,14 @@ class VariableName(NormExecutable):
             self.name = name
         else:
             self.name = name + '.' + attribute.name
+        self.lam = None
 
     def exists(self, context):
         """
-        Check whether context contains the variable
+        TODO: Check whether context contains the variable
         """
         pass
 
     def compile(self, context):
-        pass
-
-    def execute(self, context):
-        pass
+        # TODO: create or retrieve the lambda for the current variable
+        return self

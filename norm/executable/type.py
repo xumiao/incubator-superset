@@ -1,6 +1,9 @@
 from norm.executable import NormExecutable, NormError
 from norm.models import ListLambda, Lambda, PythonLambda, Variable, retrieve_type, Status
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class TypeName(NormExecutable):
 
@@ -56,6 +59,7 @@ class TypeName(NormExecutable):
             else:
                 lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
         self.lam = lam
+        return self
 
     def execute(self, context):
         return self.lam
@@ -78,9 +82,11 @@ class ListType(NormExecutable):
         Return a list type
         :rtype: ListLambda
         """
-        lam = self.intern.execute(context)
+        lam = self.intern.lam
         if lam.id is None:
-            raise NormError("{} does not seem to be declared yet".format(self.intern))
+            msg = "{} does not seem to be declared yet".format(self.intern)
+            logger.error(msg)
+            raise NormError(msg)
 
         q = context.session.query(ListLambda, Variable).join(ListLambda.variables)\
                            .filter(Variable.type_id == lam.id)
@@ -90,6 +96,7 @@ class ListType(NormExecutable):
             llam = ListLambda(lam)
             context.session.add(llam)
         self.llam = llam
+        return self
 
     def execute(self, context):
         return self.llam

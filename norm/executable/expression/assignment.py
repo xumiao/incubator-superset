@@ -16,10 +16,6 @@ class AssignmentExpr(NormExpression):
         self.variable = variable
         self.expr = expr
 
-    def compile(self, context):
-        self.expr = self.expr.compile(context)
-        return self
-
     def serialize(self):
         pass
 
