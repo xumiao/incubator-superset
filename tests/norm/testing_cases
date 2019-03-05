@@ -77,7 +77,7 @@ patterns = [r's', r'sf', r'aa'];
 & matches(test.a).any?pa;
 
 // Iterate on patterns with AND and project to variables  ('pattern_s', 'pattern_sf', 'pattern_aa')
-matches(test.a).all?{cols};
+matches(test.a).all?{cols.all};
 
 
 // Inheritance

@@ -4,6 +4,7 @@ from __future__ import division
 from __future__ import print_function
 from __future__ import unicode_literals
 
+import json
 import os
 import errno
 
@@ -27,6 +28,8 @@ import norm.config as config
 from pandas import DataFrame
 import pandas as pd
 import numpy as np
+
+from typing import List, Dict
 
 import logging
 logger = logging.getLogger(__name__)
@@ -150,18 +153,18 @@ class Lambda(Model, ParametrizedMixin):
     __tablename__ = 'lambdas'
     category = Column(String(128))
 
-    COLUMN_OUTPUT = 'output'
-    COLUMN_LABEL = 'label'
-    COLUMN_LABEL_T = 'float'
-    COLUMN_OID = 'oid'
-    COLUMN_OID_T = 'object'
-    COLUMN_PROB = 'prob'
-    COLUMN_PROB_T = 'float'
-    COLUMN_TIMESTAMP = 'timestamp'
-    COLUMN_TIMESTAMP_T = 'datetime64[ns]'
-    COLUMN_TENSOR = 'tensor'
-    COLUMN_TOMBSTONE = 'tombstone'
-    COLUMN_TOMBSTONE_T = 'bool'
+    VAR_OUTPUT = 'output'
+    VAR_LABEL = 'label'
+    VAR_LABEL_T = 'float'
+    VAR_OID = 'oid'
+    VAR_OID_T = 'object'
+    VAR_PROB = 'prob'
+    VAR_PROB_T = 'float'
+    VAR_TIMESTAMP = 'timestamp'
+    VAR_TIMESTAMP_T = 'datetime64[ns]'
+    VAR_TENSOR = 'tensor'
+    VAR_TOMBSTONE = 'tombstone'
+    VAR_TOMBSTONE_T = 'bool'
 
     # identifiers
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -206,23 +209,24 @@ class Lambda(Model, ParametrizedMixin):
 
     def __init__(self, namespace='', name='', description='', params='{}', variables=None, dtype=None, ttype=None,
                  shape=None):
-        self.id = None
-        self.namespace = namespace
-        self.name = name
-        self.version = None
-        self.description = description
-        self.params = params
-        self.owner = current_user()
-        self.status = Status.DRAFT
-        self.merged_from_ids = []
-        self.variables = variables or []
-        self.revisions = []
-        self.current_revision = -1
-        self.dtype = dtype or 'object'
-        self.ttype = ttype or 'float32'
-        self.shape = shape or [100]
-        self.anchor = True
-        self.level = Level.COMPUTABLE
+        self.id = None  # type: int
+
+        self.namespace = namespace  # type: str
+        self.name = name  # type: str
+        self.version = None  # type: int
+        self.description = description   # type: str
+        self.params = params  # type: str
+        self.owner = current_user()  # type: user_model
+        self.status = Status.DRAFT  # type: Status
+        self.merged_from_ids = []  # type: List[int]
+        self.variables = variables or []  # type: List[Variable]
+        self.revisions = []  # type: List[Revision]
+        self.current_revision = -1  # type: int
+        self.dtype = dtype or 'object'   # type: str
+        self.ttype = ttype or 'float32'  # type: str
+        self.shape = shape or [100]  # type: List[int]
+        self.anchor = True  # type: bool
+        self.level = Level.COMPUTABLE  # type: Level
         self.df = None  # type: DataFrame
 
     @orm.reconstructor
@@ -242,6 +246,13 @@ class Lambda(Model, ParametrizedMixin):
 
     def __str__(self):
         return self.signature
+
+    @property
+    def data(self):
+        if self.df is None:
+            return self.empty_data()
+        else:
+            return self.df
 
     @property
     def signature(self):
@@ -270,7 +281,7 @@ class Lambda(Model, ParametrizedMixin):
                              params=self.params, variables=self.variables)
         lam.cloned_from = self
         lam.anchor = False
-        if self.df:
+        if self.df is not None:
             lam.df = self.df.copy(False)
         return lam
 
@@ -297,8 +308,9 @@ class Lambda(Model, ParametrizedMixin):
         """
         Compact this version with previous versions to make an anchor version
         :return:
+        TODO: to implement
         """
-        raise NotImplementedError
+        pass
 
     @_check_draft_status
     def conjunction(self):
@@ -329,12 +341,48 @@ class Lambda(Model, ParametrizedMixin):
         revision = FitRevision('', '')
         self._add_revision(revision)
 
-    def adapt(self):
+    def _add_data(self, query, df):
+        cols = {col: dtype for col, dtype in zip(df.columns, df.dtypes)}
+        for v in self.variables:
+            assert(cols.get(v.name, v.type_.dtype) == v.type_.dtype)
+        from norm.models.native import get_type_by_dtype
+        vars_to_add = [Variable(col, get_type_by_dtype(dtype)) for col, dtype in cols.items()
+                       if col not in self._all_columns]
+        if len(vars_to_add) > 0:
+            from norm.models.revision import AddVariableRevision
+            self._add_revision(AddVariableRevision(vars_to_add))
+        from norm.models.revision import DisjunctionRevision
+        added_data = DisjunctionRevision(query, 'Append new data')
+        added_data.delta = df
+        self._add_revision(added_data)
+
+    @_check_draft_status
+    def read_csv(self, path, params):
         """
-        Adapt the model with the data for this version
-        :return:
+        Read data from a file
+        :param path: the path to the data file
+        :type path: str
+        :param params: the parameters for reading csv
+        :type params: Dict
         """
-        raise NotImplementedError
+        df = pd.read_csv(path, **params)
+        query = 'read("{}", {}, "csv")'.format(path, ', '.join('{}={}'.format(key, value)
+                                                               for key, value in params.items()))
+        self._add_data(query, df)
+
+    @_check_draft_status
+    def read_parquet(self, path, params):
+        df = pd.read_parquet(path, **params)
+        query = 'read("{}", {}, "parq")'.format(path, ', '.join('{}={}'.format(key, value)
+                                                                for key, value in params.items()))
+        self._add_data(query, df)
+
+    @_check_draft_status
+    def read_jsonl(self, path):
+        with open(path) as f:
+            df = DataFrame([json.loads(line) for line in f])
+        query = 'read("{}", "jsonl")'.format(path)
+        self._add_data(query, df)
 
     @_check_draft_status
     def add_variable(self, *variables):
@@ -447,12 +495,6 @@ class Lambda(Model, ParametrizedMixin):
                 logger.error(msg)
                 raise RuntimeError(msg)
 
-    def __call__(self, *args, **kwargs):
-        """
-        TODO: implement
-        """
-        raise NotImplementedError
-
     @property
     def folder(self):
         return '{}/{}/{}'.format(config.DATA_STORAGE_ROOT,
@@ -478,21 +520,20 @@ class Lambda(Model, ParametrizedMixin):
 
     @property
     def _tensor_columns(self):
-        return ['{}_{}'.format(self.COLUMN_TENSOR, i) for i in range(int(np.prod(self.shape)))]
+        return ['{}_{}'.format(self.VAR_TENSOR, i) for i in range(int(np.prod(self.shape)))]
 
     @property
     def _all_columns(self):
-        return [self.COLUMN_OID, self.COLUMN_PROB, self.COLUMN_LABEL, self.COLUMN_TIMESTAMP,
-                self.COLUMN_TOMBSTONE] + self._tensor_columns + [v.name for v in self.variables]
+        return [self.VAR_OID, self.VAR_PROB, self.VAR_LABEL, self.VAR_TIMESTAMP,
+                self.VAR_TOMBSTONE] + self._tensor_columns + [v.name for v in self.variables]
 
     @property
     def _all_column_types(self):
-        return [self.COLUMN_OID_T, self.COLUMN_PROB_T, self.COLUMN_LABEL_T, self.COLUMN_TIMESTAMP_T,
-                self.COLUMN_TOMBSTONE_T] + [self.ttype] * len(self._tensor_columns) + \
+        return [self.VAR_OID_T, self.VAR_PROB_T, self.VAR_LABEL_T, self.VAR_TIMESTAMP_T,
+                self.VAR_TOMBSTONE_T] + [self.ttype] * len(self._tensor_columns) + \
                [v.type_.dtype for v in self.variables]
 
-    @_only_queryable
-    def _empty_data(self):
+    def empty_data(self):
         """
         Create an empty data frame
         :return: the data frame with columns
@@ -512,7 +553,7 @@ class Lambda(Model, ParametrizedMixin):
             return self.df
 
         if self.anchor:
-            self.df = self._empty_data()
+            self.df = self.empty_data()
         elif self.cloned_from is None:
             msg = "Failed to find the anchor version. The chain is broken for {}".format(self)
             logger.error(msg)
@@ -527,7 +568,7 @@ class Lambda(Model, ParametrizedMixin):
                 revision.redo()
 
         # Choose the rows still alive and the columns specified in schema
-        self.df = self.df[self._all_columns][~self.df[self.COLUMN_TOMBSTONE]]
+        self.df = self.df[self._all_columns][~self.df[self.VAR_TOMBSTONE]]
         return self.df
 
     @_only_queryable
@@ -545,26 +586,38 @@ class Lambda(Model, ParametrizedMixin):
     def _build_model(self):
         """
         Build an adaptable model
+        TODO: to implement
         """
-        raise NotImplementedError
+        pass
 
     @_only_adaptable
     def _load_model(self):
         """
         Load an adapted model
+        TODO: to implement
         :return:
         """
-        raise NotImplementedError
+        pass
 
     @_only_adaptable
     def _save_model(self):
         """
         Save an adapted model
+        TODO: to implement
         :return:
         """
-        raise NotImplementedError
+        pass
 
     def query(self, inputs, outputs):
+        """
+        Query the Lambda according to the inputs, and generate another Lambda projected to the outputs
+        :param inputs: the inputs
+        :type inputs: Dict[str, Lambda]
+        :param outputs: the outputs
+        :type outputs: Dict[str, str]
+        :return: the resulting view of the data
+        :rtype: Lambda
+        """
         filters = None
         projections = None
         if projections is None:
@@ -640,14 +693,14 @@ class KerasLambda(Lambda):
         pass
 
 
-def retrieve_type(namespaces, name, version, session, status=None):
+def retrieve_type(namespaces, name, version=None, status=None, session=None):
     """
     Retrieving a Lambda
     :type namespaces: str, List[str] or None
     :type name: str
     :type version: int or None
-    :type session: sqlalchemy.orm.Session
     :type status: Status or None
+    :type session: sqlalchemy.orm.Session
     :return: the Lambda or None
     """
     #  find the latest versions
@@ -661,6 +714,10 @@ def retrieve_type(namespaces, name, version, session, status=None):
             queries.append(Lambda.namespace.in_(namespaces))
     if version is not None and isinstance(version, int):
         queries.append(Lambda.version <= version)
+
+    if session is None:
+        from norm.config import db
+        session = db.session
     lams = session.query(with_polymorphic(Lambda, '*')) \
                   .filter(*queries) \
                   .order_by(desc(Lambda.version)) \

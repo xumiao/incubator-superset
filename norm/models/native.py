@@ -7,7 +7,7 @@ from __future__ import unicode_literals
 from sqlalchemy import exists
 
 from norm.config import db
-from norm.models.norm import Lambda, Variable, Status
+from norm.models.norm import Lambda, Variable, Status, retrieve_type
 
 import logging
 import traceback
@@ -223,3 +223,10 @@ class TensorLambda(NativeLambda):
         self.ttype = dtype
 
 
+def get_type_by_dtype(dtype):
+    if dtype.find('int') > -1:
+        return retrieve_type('norm.native', 'Integer')
+    elif dtype.find('float') > -1:
+        return retrieve_type('norm.native', 'Float')
+    else:
+        return retrieve_type('norm.native', 'Any')

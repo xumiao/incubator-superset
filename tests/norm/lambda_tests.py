@@ -11,9 +11,9 @@ class LambdaTestCase(NormTestCase):
         lam = Lambda(namespace=self.executor.context_namespace,
                      name='Test',
                      description='Test lambda',
-                     variables=[Variable('a', retrieve_type('norm.native', 'String', None, self.session)),
-                                Variable('b', retrieve_type('norm.native', 'Integer', None, self.session)),
-                                Variable('c', retrieve_type('norm.native', 'Datetime', None, self.session))]
+                     variables=[Variable('a', retrieve_type('norm.native', 'String', session=self.session)),
+                                Variable('b', retrieve_type('norm.native', 'Integer', session=self.session)),
+                                Variable('c', retrieve_type('norm.native', 'Datetime', session=self.session))]
                      )
         self.assertTrue(lam is not None)
         self.assertTrue(lam.version is None)
@@ -29,9 +29,9 @@ class LambdaTestCase(NormTestCase):
         lam = Lambda(namespace=self.executor.context_namespace,
                      name='Test',
                      description='Test lambda',
-                     variables=[Variable('a', retrieve_type('norm.native', 'String', None, self.session)),
-                                Variable('b', retrieve_type('norm.native', 'Integer', None, self.session)),
-                                Variable('c', retrieve_type('norm.native', 'Datetime', None, self.session))]
+                     variables=[Variable('a', retrieve_type('norm.native', 'String', session=self.session)),
+                                Variable('b', retrieve_type('norm.native', 'Integer', session=self.session)),
+                                Variable('c', retrieve_type('norm.native', 'Datetime', session=self.session))]
                      )
         lam.status = Status.READY
         cloned = lam.clone()
@@ -74,25 +74,25 @@ class LambdaTestCase(NormTestCase):
         lam = Lambda(namespace=self.executor.context_namespace,
                      name='Test',
                      description='Test lambda',
-                     variables=[Variable('a', retrieve_type('norm.native', 'String', None, self.session)),
-                                Variable('b', retrieve_type('norm.native', 'Integer', None, self.session)),
-                                Variable('c', retrieve_type('norm.native', 'Datetime', None, self.session))]
+                     variables=[Variable('a', retrieve_type('norm.native', 'String', session=self.session)),
+                                Variable('b', retrieve_type('norm.native', 'Integer', session=self.session)),
+                                Variable('c', retrieve_type('norm.native', 'Datetime', session=self.session))]
                      )
         lam.level = Level.QUERYABLE
-        df = lam._empty_data()
-        self.assertTrue(all(df.columns == [lam.COLUMN_OID, lam.COLUMN_PROB, lam.COLUMN_LABEL,
-                                           lam.COLUMN_TIMESTAMP, lam.COLUMN_TOMBSTONE]
+        df = lam.empty_data()
+        self.assertTrue(all(df.columns == [lam.VAR_OID, lam.VAR_PROB, lam.VAR_LABEL,
+                                           lam.VAR_TIMESTAMP, lam.VAR_TOMBSTONE]
                             + lam._tensor_columns + ['a', 'b', 'c']))
-        self.assertTrue(df.dtypes[lam.COLUMN_TOMBSTONE] == lam.COLUMN_TOMBSTONE_T)
-        self.assertTrue(df.dtypes[lam.COLUMN_TIMESTAMP] == lam.COLUMN_TIMESTAMP_T)
-        self.assertTrue(df.dtypes[lam.COLUMN_LABEL] == lam.COLUMN_LABEL_T)
-        self.assertTrue(df.dtypes[lam.COLUMN_PROB] == lam.COLUMN_PROB_T)
-        self.assertTrue(df.dtypes[lam.COLUMN_OID] == lam.COLUMN_OID_T)
+        self.assertTrue(df.dtypes[lam.VAR_TOMBSTONE] == lam.VAR_TOMBSTONE_T)
+        self.assertTrue(df.dtypes[lam.VAR_TIMESTAMP] == lam.VAR_TIMESTAMP_T)
+        self.assertTrue(df.dtypes[lam.VAR_LABEL] == lam.VAR_LABEL_T)
+        self.assertTrue(df.dtypes[lam.VAR_PROB] == lam.VAR_PROB_T)
+        self.assertTrue(df.dtypes[lam.VAR_OID] == lam.VAR_OID_T)
         self.assertTrue(all([df.dtypes[col] == lam.ttype for col in lam._tensor_columns]))
         self.assertTrue(df.dtypes['a'] == 'object')
         self.assertTrue(df.dtypes['b'] == 'int')
         self.assertTrue(df.dtypes['c'] == 'datetime64[ns]')
 
     def test_empty_data_native(self):
-        lam = retrieve_type('norm.native', 'String', None, self.session)
-        self.assertTrue(lam._empty_data() is None)
+        lam = retrieve_type('norm.native', 'String', session=self.session)
+        self.assertTrue(lam.empty_data() is None)

@@ -37,14 +37,14 @@ class TypeName(NormExecutable):
         """
         session = context.session
         if self.namespace is None:
-            lam = retrieve_type(context.context_namespace, self.name, self.version, session)
+            lam = retrieve_type(context.context_namespace, self.name, self.version, session=session)
             if lam is None:
-                lam = retrieve_type(context.search_namespaces, self.name, self.version, session, Status.READY)
+                lam = retrieve_type(context.search_namespaces, self.name, self.version, Status.READY, session=session)
         else:
             if self.namespace == context.context_namespace:
-                lam = retrieve_type(self.namespace, self.name, self.version, session)
+                lam = retrieve_type(self.namespace, self.name, self.version, session=session)
             elif self.namespace.startswith('python'):
-                lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
+                lam = retrieve_type(self.namespace, self.name, self.version, Status.READY, session=session)
                 if lam is None:
                     # create a new PythonLambda
                     d = {}
@@ -57,7 +57,7 @@ class TypeName(NormExecutable):
                     lam = PythonLambda(namespace=self.namespace, name=self.name, description=v.__doc__)
                     session.add(lam)
             else:
-                lam = retrieve_type(self.namespace, self.name, self.version, session, Status.READY)
+                lam = retrieve_type(self.namespace, self.name, self.version, Status.READY, session=session)
         self.lam = lam
         return self
 
