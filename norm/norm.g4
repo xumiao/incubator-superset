@@ -32,7 +32,7 @@ imports
 
 SPACED_IMPORT: 'import'|'Import'|'IMPORT' [ \t]*;
 
-argumentDeclaration : VARNAME (WS|NS)? COLON (WS|NS)? typeName;
+argumentDeclaration : variable (WS|NS)? COLON (WS|NS)? typeName;
 
 argumentDeclarations: argumentDeclaration ((WS|NS)? COMMA (WS|NS)? argumentDeclaration)*;
 
@@ -46,25 +46,13 @@ typeName
 
 variable
     : VARNAME
-    | VARNAME DOT variable
+    | variable DOT VARNAME
     ;
 
 queryProjection
     : '?' variable?
     | '?' LCBR variable (COMMA variable)* RCBR
     | '?' LBR variable (COMMA variable)* RBR
-    ;
-
-argumentExpression
-    : arithmeticExpression
-    | queryProjection
-    | variable queryProjection
-    | variable spacedConditionOperator arithmeticExpression queryProjection?
-    ;
-
-argumentExpressions
-    : LBR RBR
-    | LBR argumentExpression ((WS|NS)? COMMA (WS|NS)? argumentExpression)* RBR
     ;
 
 constant
@@ -83,6 +71,19 @@ constant
 code: ~(PYTHON_BLOCK|SQL_BLOCK|BLOCK_END)*;
 
 codeExpression: (PYTHON_BLOCK|SQL_BLOCK) code BLOCK_END;
+
+argumentExpression
+    : arithmeticExpression
+    | queryProjection
+    | variable queryProjection
+    | variable (WS|NS)? AS (WS|NS)? arithmeticExpression queryProjection?
+    | variable spacedConditionOperator arithmeticExpression queryProjection?
+    ;
+
+argumentExpressions
+    : LBR RBR
+    | LBR argumentExpression ((WS|NS)? COMMA (WS|NS)? argumentExpression)* RBR
+    ;
 
 evaluationExpression
     : constant
@@ -159,7 +160,7 @@ LSBR: '[' (WS|NS)?;
 RSBR: (WS|NS)? ']';
 
 NONE:      'none' | 'null' | 'na' | 'None' | 'Null' | 'Na' | 'NONE' | 'NULL' | 'NA';
-AS:        'as' | 'As' | 'AS';
+AS:        'as' | 'As' | 'AS' | '=';
 COLON:     ':';
 SEMICOLON: ';';
 COMMA:     ',';
@@ -168,7 +169,7 @@ DOTDOT:    '..';
 
 IN:        'in'  | 'IN'  | 'In';
 NI:        '!in' | '!IN' | '!In';
-EQ:        '=' | '==';
+EQ:        '==';
 NE:        '!=';
 GE:        '>=';
 LE:        '<=';

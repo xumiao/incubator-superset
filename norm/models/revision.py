@@ -42,9 +42,10 @@ class Revision(Model, ParametrizedMixin):
         'polymorphic_on': category
     }
 
-    def __init__(self, query, description):
+    def __init__(self, query, description, lam):
         self.query = query
         self.description = description
+        self.lam = lam  # type: Lambda
 
     def save(self):
         """
@@ -88,8 +89,8 @@ class SchemaRevision(Revision):
     renames = Column(JSON, default={})
     variables = relationship(Variable, secondary=revision_variable)
 
-    def __init__(self):
-        super().__init__('', '')
+    def __init__(self, lam):
+        super().__init__('', '', lam)
 
     def save(self):
         pass
@@ -104,13 +105,13 @@ class AddVariableRevision(SchemaRevision):
         'polymorphic_identity': 'revision_schema_add'
     }
 
-    def __init__(self, variables):
-        super().__init__()
+    def __init__(self, variables, lam):
+        super().__init__(lam)
         current_variable_names = set((v.name for v in self.lam.variables))
         self.variables = [v for v in variables if v.name not in current_variable_names]
 
     def apply(self):
-        self.lam.variables.extends(self.variables)
+        self.lam.variables.extend(self.variables)
 
     def undo(self):
         for v in reversed(self.variables):
@@ -124,8 +125,8 @@ class RenameVariableRevision(SchemaRevision):
         'polymorphic_identity': 'revision_schema_rename'
     }
 
-    def __init__(self, renames):
-        super().__init__()
+    def __init__(self, renames, lam):
+        super().__init__(lam)
         current_variable_names = set((v.name for v in self.lam.variables))
         self.renames = dict((old_name, new_name) for old_name, new_name in renames.items()
                             if old_name in current_variable_names)
@@ -150,8 +151,8 @@ class RetypeVariableRevision(SchemaRevision):
         'polymorphic_identity': 'revision_schema_rename'
     }
 
-    def __init__(self, variables):
-        super().__init__()
+    def __init__(self, variables, lam):
+        super().__init__(lam)
         current_variable_names = set((v.name for v in self.lam.variables))
         self.variables = [v for v in variables if v.name in current_variable_names]
         variable_names = set((v.name for v in self.variables))
@@ -186,8 +187,8 @@ class DeleteVariableRevision(SchemaRevision):
         'polymorphic_identity': 'revision_schema_delete'
     }
 
-    def __init__(self, names):
-        super().__init__()
+    def __init__(self, names, lam):
+        super().__init__(lam)
         assert(isinstance(names, list))
         current_variable_names = set((v.name for v in self.lam.variables))
         self.renames = dict((name, '') for name in names if name in current_variable_names)
@@ -206,8 +207,8 @@ class DeltaRevision(Revision):
         'polymorphic_identity': 'revision_delta'
     }
 
-    def __init__(self, query, description):
-        super().__init__(query, description)
+    def __init__(self, query, description, lam):
+        super().__init__(query, description, lam)
         self._delta = None
 
     @orm.reconstructor
@@ -269,8 +270,8 @@ class ConjunctionRevision(DeltaRevision):
         'polymorphic_identity': 'revision_delta_conjunction'
     }
 
-    def __init__(self, query, description):
-        super().__init__(query, description)
+    def __init__(self, query, description, lam):
+        super().__init__(query, description, lam)
 
     def apply(self):
         pass
@@ -288,17 +289,22 @@ class DisjunctionRevision(DeltaRevision):
         'polymorphic_identity': 'revision_delta_disjunction'
     }
 
-    def __init__(self, query, description):
-        super().__init__(query, description)
+    def __init__(self, query, description, lam):
+        super().__init__(query, description, lam)
+        self.orig_df = None
 
     def apply(self):
-        pass
+        self.orig_df = self.lam.df
+        if self.lam.df is not None:
+            self.lam.df = self.lam.df.append(self.delta)
+        else:
+            self.lam.df = self.delta
 
     def undo(self):
-        pass
+        self.lam.df = self.orig_df
 
     def redo(self):
-        pass
+        self.apply()
 
 
 class FitRevision(DeltaRevision):
@@ -307,8 +313,8 @@ class FitRevision(DeltaRevision):
         'polymorphic_identity': 'revision_delta_fit'
     }
 
-    def __init__(self, query, description):
-        super().__init__(query, description)
+    def __init__(self, query, description, lam):
+        super().__init__(query, description, lam)
 
     def apply(self):
         pass

@@ -21,6 +21,7 @@ from norm.executable.implementation import *
 from norm.executable.type import *
 from norm.executable.namespace import *
 from norm.literals import AOP, COP, LOP, ImplType, CodeMode, ConstantType
+from norm.models import CoreLambda
 from norm.utils import current_user
 from norm.normLexer import normLexer
 from norm.normListener import normListener
@@ -52,8 +53,7 @@ class NormCompiler(normListener):
         # context_id, user, namespaces should be able to be cached directly
         # scope, stack and session should be reset
         self.context_id = context_id
-        self.scope = None
-        self.op = None
+        self.scope = None  # type: Lambda
         self.stack = []
         self.session = None
         self.user = None
@@ -67,7 +67,8 @@ class NormCompiler(normListener):
         self.context_namespace = '{}.{}'.format(config.CONTEXT_NAMESPACE_STUB, self.context_id)
         self.user_namespace = '{}.{}'.format(config.USER_NAMESPACE_STUB, self.user.username)
         from norm.models import NativeLambda
-        self.search_namespaces = {NativeLambda.NAMESPACE, self.context_namespace, self.user_namespace}
+        self.search_namespaces = {NativeLambda.NAMESPACE, CoreLambda.NAMESPACE, self.context_namespace,
+                                  self.user_namespace}
 
     def set_session(self, session):
         """
@@ -77,7 +78,6 @@ class NormCompiler(normListener):
         """
         self.session = session
         self.scope = None
-        self.op = None
         self.stack = []
 
     def set_temp_scope(self):
@@ -89,13 +89,13 @@ class NormCompiler(normListener):
         self.scope = Lambda(self.context_namespace, self.TMP_VARIABLE_STUB + str(uuid.uuid4()))
 
     def _push(self, exe):
-        self._push(exe)
+        self.stack.append(exe)
 
     def _pop(self):
         """
         :rtype: NormExecutable
         """
-        return self._pop()
+        return self.stack.pop()
 
     def _peek(self):
         """
@@ -162,10 +162,11 @@ class NormCompiler(normListener):
                 raise NormError(msg)
             self._push(TypeImplementation(type_name, op, query, description).compile(self))
         elif ctx.imports() or ctx.exports() or ctx.multiLineExpression():
-            expr = self._pop()
-            # ignore comments
-            self._pop()
-            self._push(expr)
+            if ctx.comments():
+                expr = self._pop()
+                # ignore comments
+                self._pop()
+                self._push(expr)
 
     def exitNone(self, ctx:normParser.NoneContext):
         self._push(Constant(ConstantType.NULL, None).compile(self))
@@ -265,15 +266,16 @@ class NormCompiler(normListener):
             raise ParseError('Not a valid type name definition')
 
     def exitVariable(self, ctx:normParser.VariableContext):
-        variable = ctx.VARNAME().getText()
-        attribute = self._pop() if ctx.variable() else None  # type: VariableName
-        self._push(VariableName(variable, attribute).compile(self))
+        name = ctx.VARNAME().getText()  # type: str
+        scope = self._pop() if ctx.variable() else None  # type: VariableName
+        self._push(VariableName(scope, name).compile(self))
 
     def exitArgumentExpression(self, ctx:normParser.ArgumentExpressionContext):
         projection = self._pop() if ctx.queryProjection() else None  # type: Projection
         expr = self._pop() if ctx.arithmeticExpression() else None  # type: ArithmeticExpr
         op = COP(ctx.spacedConditionOperator().conditionOperator().getText().lower()) \
             if ctx.spacedConditionOperator() else None  # type: COP
+        # = is treated as op is None
         variable = self._pop() if ctx.variable() else None  # type: VariableName
         self._push(ArgumentExpr(variable, op, expr, projection).compile(self))
 

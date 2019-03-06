@@ -71,6 +71,9 @@ class Constant(NormExecutable):
         else:
             raise NotImplementedError
 
+    def execute(self, context):
+        return self.value
+
 
 class ListConstant(Constant):
 
@@ -87,4 +90,8 @@ class ListConstant(Constant):
 
     def __str__(self):
         return '[' + ','.join(str(v) for v in self.value) + ']'
+
+    def execute(self, context):
+        return self.value
+
 

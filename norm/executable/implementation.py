@@ -1,5 +1,5 @@
 from norm.executable import NormExecutable, NormError
-from norm.executable.expression.base import NormExpression
+from norm.executable.expression import NormExpression
 from norm.models import Lambda
 
 

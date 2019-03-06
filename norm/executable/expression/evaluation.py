@@ -1,13 +1,11 @@
 from norm.literals import COP
 
-from norm.executable import NormExecutable, NormError, Constant
+from norm.executable import NormError, Constant
 from norm.executable.expression.argument import ArgumentExpr
-from norm.executable.variable import VariableName
+from norm.executable.variable import VariableName, ColumnVariable
 from norm.executable.expression import NormExpression
 
 from typing import List, Union
-
-import pandas as pd
 
 import logging
 logger = logging.getLogger(__name__)
@@ -48,14 +46,13 @@ class EvaluationExpr(NormExpression):
         keyword_arg = False  # positional argument
         for arg in self.args:
             if arg.op is None:
-                assert(arg.variable is None)
-                if keyword_arg:
-                    msg = 'Keyword based arguments should come after positional arguments'
-                    logger.error(msg)
-                    raise NormError(msg)
-            elif arg.op == COP.EQ:
-                assert(arg.variable is not None)
-                keyword_arg = True
+                if arg.variable is None:
+                    if keyword_arg:
+                        msg = 'Keyword based arguments should come after positional arguments'
+                        logger.error(msg)
+                        raise NormError(msg)
+                else:
+                    keyword_arg = True
             else:
                 return False
         return True
@@ -73,7 +70,7 @@ class EvaluationExpr(NormExpression):
         inputs = {}
         from norm.models.norm import Variable
         for ov, arg in zip(self.lam.variables[:nargs], self.args):  # type: Variable, ArgumentExpr
-            if arg.op == COP.EQ:
+            if arg.op is None and arg.variable is not None:
                 keyword_arg = True
             if not keyword_arg:
                 inputs[ov.name] = arg.expr
@@ -145,7 +142,7 @@ class EvaluationExpr(NormExpression):
 
     def execute(self, context):
         if isinstance(self.inputs, dict):
-            inputs = dict((key, value.execute(context)) for key, value in self.inputs)
+            inputs = dict((key, value.execute(context)) for key, value in self.inputs.items())
         else:
             inputs = self.inputs
         return self.lam.query(inputs, self.outputs)
@@ -161,7 +158,7 @@ class ChainedEvaluationExpr(NormExpression):
         * a.test(sf, s)
         * a.b.c
         :param lexpr: base query expressions or chained expression
-        :type lexpr: NormExpression
+        :type lexpr: Union[VariableName, EvaluationExpr]
         :param rexpr: chained evaluation expression
         :type rexpr: Union[EvaluationExpr, VariableName]
         """
@@ -176,53 +173,28 @@ class ChainedEvaluationExpr(NormExpression):
     def compile(self, context):
         if isinstance(self.rexpr, VariableName):
             if isinstance(self.lexpr, VariableName):
-                combined = VariableName(self.lexpr.name, self.rexpr).compile(context)
-                if combined.lam:
-                    # a.b already exists in the current scope
-                    return combined
-                if self.lexpr.lam.has_variable(self.rexpr.name):
-                    # TODO: create a new Lambda of one field
-                    pass
-                # a.b where a exists but b does not ( to join with the Lambda of a )
-                # TODO: join Lambda of a
-                pass
+                return VariableName(self.lexpr, self.rexpr.name).compile(context)
             elif isinstance(self.lexpr, EvaluationExpr):
-                if self.lexpr.lam.has_variable(self.rexpr.name):
-                    # TODO: create a new Lambda of one field
-                    pass
+                if self.rexpr.name in self.lexpr.lam:
+                    return ColumnVariable(self.lexpr, self.rexpr.name)
                 else:
                     msg = '{} does not exist in the {}'.format(self.rexpr, self.lexpr)
                     logger.error(msg)
                     raise NormError(msg)
-            # TODO: variable can be an function if no argument provided. a.name.count where count is a function
+            else:
+                msg = 'Only a variable or an evaluation can have chained operation for now, ' \
+                      'but got {}'.format(self.lexpr)
+                logger.error(msg)
+                raise NormError(msg)
         elif isinstance(self.rexpr, EvaluationExpr):
             # Evaluation with the previous expression as the first input argument
             self.rexpr.args = [ArgumentExpr(None, None, self.lexpr, None)] + self.rexpr.args
             # Recompile the expression
-            self.rexpr.compile(context)
-            return self.rexpr
-        return self
+            return self.rexpr.compile(context)
+        else:
+            msg = 'Only chaining on a variable or an evaluation, but got {}'.format(self.rexpr)
+            logger.error(msg)
+            raise NormError(msg)
 
     def execute(self, context):
-        lam = self.lexpr.execute(context)
-
-        # TODO: Specialized to aggregations
-        """
-        if isinstance(self.rexpr, EvaluationExpr):
-            agg_expr = self.rexpr
-            agg_exp = agg_expr.type_name.name
-            if agg_exp == 'Distinct':
-                df = df.drop_duplicates()
-                df = df.reset_index()
-            elif agg_exp == 'Count':
-                df = pd.DataFrame(df.count()).reset_index().rename(columns={"index": "column", 0: "count"})
-            elif agg_exp == 'Order':
-                arg = self.rexpr.args[0].expr
-                col = arg.aexpr.value
-                df = df.sort_values(by=col)
-        elif isinstance(self.rexpr, VariableName):
-            # TODO: check whether the property is correct
-            return df[[self.rexpr.name]]
-        """
-        # TODO: deal with projection
-        return lam
+        return self.lam

@@ -85,7 +85,6 @@ class TypeDeclaration(NormExecutable):
         """
         # TODO: optimize to query db in batch for all types or utilize cache
         variables = [var_declaration.var for var_declaration in self.argument_declarations]
-        self.type_name.namespace = context.context_namespace
         lam = self.type_name.lam  # type: Lambda
         if lam is None:
             #  Create a new Lambda
@@ -93,18 +92,17 @@ class TypeDeclaration(NormExecutable):
             lam.description = self.description
             lam.variables = variables
             context.session.add(lam)
-            return lam
         else:
             assert(lam.status == Status.DRAFT)
-            # Revise the existing schema
-            current_variable_names = set(v.name for v in lam.variables)
-            new_variable_names = set(v.name for v in variables)
-            lam.delete_variable(*current_variable_names.difference(new_variable_names))
-            lam.astype(*variables)
-            lam.add_variable(*variables)
-            # TODO: make a doc change revision
-            if self.description:
-                lam.description = self.description
+            if sorted(lam.variables, key=lambda v: v.name) != sorted(variables, key=lambda v: v.name):
+                # Revise the existing schema
+                new_variables = {v.name: v.type_ for v in variables}
+                current_variables = {v.name: v.type_ for v in lam.variables}
+                lam.delete_variable([v.name for v in lam.variables if new_variables.get(v.name, None) != v.type_])
+                lam.add_variable([v for v in variables if current_variables.get(v.name, None) != v.type_])
+                # TODO: make a doc change revision
+                if self.description:
+                    lam.description = self.description
         self.lam = lam
         return self
 

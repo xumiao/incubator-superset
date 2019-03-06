@@ -41,26 +41,13 @@ class ConditionExpr(NormExpression):
         return self._condition
 
     def compile(self, context):
-        if self._condition is not None:
-            return self
-
-        if isinstance(self.lexpr, VariableName) and not self.lexpr.exists(context):
-            if self.op == COP.EQ:
-                return AssignmentExpr(self.lexpr, self.rexpr)
-            else:
-                msg = 'Can not find the variable {} in the current context'.format(self.lexpr)
-                logger.error(msg)
-                raise NormError(msg)
+        if self.op == COP.LK:
+            assert(isinstance(self.lexpr, VariableName))
+            assert(isinstance(self.rexpr, Constant))
+            assert(self.rexpr.type_ is ConstantType.STR or self.rexpr.type_ is ConstantType.PTN)
+            self._condition = '{}.str.contains("{}")'.format(self.lexpr, self.rexpr)
         else:
-            self.lexpr = self.lexpr.compile(context)
-            self.rexpr = self.rexpr.compile(context)
-            if self.op == COP.LK:
-                assert(isinstance(self.lexpr, VariableName))
-                assert(isinstance(self.rexpr, Constant))
-                assert(self.rexpr.type_ is ConstantType.STR or self.rexpr.type_ is ConstantType.PTN)
-                self._condition = '{}.str.contains("{}")'.format(self.lexpr, self.rexpr)
-            else:
-                self._condition = '({}) {} ({})'.format(self.lexpr, self.op, self.rexpr)
+            self._condition = '({}) {} ({})'.format(self.lexpr, self.op, self.rexpr)
         return self
 
     def serialize(self):

@@ -64,6 +64,9 @@ class NativeLambda(Lambda):
         self.status = Status.READY
         self.shape = []
 
+    def empty_data(self):
+        return None
+
 
 @RegisterNatives()
 class TypeLambda(NativeLambda):
@@ -224,9 +227,16 @@ class TensorLambda(NativeLambda):
 
 
 def get_type_by_dtype(dtype):
-    if dtype.find('int') > -1:
+    """
+    Convert the numpy dtype to native lambda
+    :param dtype: the numpy dtype
+    :type dtype: numpy.dtype
+    :return: the Lambda
+    :rtype: Lambda
+    """
+    if dtype.name.find('int') > -1:
         return retrieve_type('norm.native', 'Integer')
-    elif dtype.find('float') > -1:
+    elif dtype.name.find('float') > -1:
         return retrieve_type('norm.native', 'Float')
     else:
         return retrieve_type('norm.native', 'Any')

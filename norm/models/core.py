@@ -110,8 +110,11 @@ class ReadFileLambda(CoreLambda):
         if lam is None or path is None:
             return None
 
-        path = path.data.iloc[0][0]
+        if isinstance(path, Lambda):
+            path = path.data.iloc[0][0]
         assert(isinstance(path, str))
+        if ext and isinstance(ext, Lambda):
+            ext = ext.data.iloc[0][0]
         if ext is None:
             last_path = path.split('.')[-1]
             if last_path == self.EXT_CSV:
@@ -141,6 +144,7 @@ class ReadFileLambda(CoreLambda):
                   'and JSONL (.jsonl)'
             logger.error(msg)
             raise TypeError(msg)
+        return lam
 
 
 @RegisterCores()
@@ -169,22 +173,21 @@ class StringFormatterLambda(CoreLambda):
             return None
 
         v_cols = list(variables.data.columns)
-        if isinstance(formatter.data, DataFrame):
+        if isinstance(formatter, Lambda):
             assert(len(formatter.data) == len(variables.data))
             f_col = formatter.data.columns[0]
             df = formatter.data.reset_index().join(variables.data.reset_index())
             data = df.apply(lambda x: x[f_col].format(*[x[c] for c in v_cols]), axis=1)
         else:
-            assert(isinstance(formatter.data, str))
-            f = formatter.data
-            data = variables.data.apply(lambda x: f.format(*[x[c] for c in v_cols]), axis=1)
+            assert(isinstance(formatter, str))
+            data = variables.data.apply(lambda x: formatter.format(*[x[c] for c in v_cols]), axis=1)
 
         lam = self.variables[-1].type_.clone()
         lam.data = DataFrame(data=data)
         return lam
 
 
-@RegisterCores
+@RegisterCores()
 class ExtractPatternLambda(CoreLambda):
     __mapper_args__ = {
         'polymorphic_identity': 'lambda_core_extract_pattern'

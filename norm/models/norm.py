@@ -63,6 +63,14 @@ class Variable(Model, ParametrizedMixin):
         self.name = name
         self.type_ = type_
 
+    def __hash__(self):
+        return hash(self.name) + hash(self.type_)
+
+    def __eq__(self, other):
+        if other is None or not isinstance(other, Variable):
+            return False
+        return other.name == self.name and other.type_ == self.type_
+
 
 lambda_variable = Table(
     'lambda_variable', metadata,
@@ -210,7 +218,6 @@ class Lambda(Model, ParametrizedMixin):
     def __init__(self, namespace='', name='', description='', params='{}', variables=None, dtype=None, ttype=None,
                  shape=None):
         self.id = None  # type: int
-
         self.namespace = namespace  # type: str
         self.name = name  # type: str
         self.version = None  # type: int
@@ -247,12 +254,50 @@ class Lambda(Model, ParametrizedMixin):
     def __str__(self):
         return self.signature
 
+    def __hash__(self):
+        if self.id is not None:
+            return self.id
+        h = 0
+        if self.namespace:
+            h += hash(self.namespace) << 7
+        h += hash(self.name) << 7
+        if self.version:
+            h += hash(self.version)
+        return h
+
+    def __eq__(self, other):
+        if not isinstance(other, Lambda):
+            return False
+
+        return hash(self) == hash(other)
+
+    def __contains__(self, item):
+        if isinstance(item, Variable):
+            return item.name in self._all_columns
+
+        if isinstance(item, str):
+            return item in self._all_columns
+
+        return False
+
+    def get_type(self, variable_name):
+        """
+        Get the type of the variable by the name
+        :param variable_name: the name of the variable
+        :type variable_name: str
+        :return: the type of that variable
+        :rtype: Lambda
+        """
+        for v in self.variables:
+            if v.name == variable_name:
+                return v.type_
+        return None
+
     @property
     def data(self):
         if self.df is None:
-            return self.empty_data()
-        else:
-            return self.df
+            self.df = self.empty_data()
+        return self.df
 
     @property
     def signature(self):
@@ -260,16 +305,6 @@ class Lambda(Model, ParametrizedMixin):
             return '@'.join((self.namespace + '.' + self.name, str(self.version)))
         else:
             return '@'.join((self.name, str(self.version)))
-
-    def has_variable(self, variable_name):
-        """
-        Check whether the given variable name exists in the variable list
-        :param variable_name: the name of the variable
-        :type variable_name: str
-        :return: True or False
-        :rtype: bool
-        """
-        return variable_name in self._all_columns
 
     def clone(self):
         """
@@ -319,7 +354,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         from norm.models.revision import ConjunctionRevision
         # TODO: implement the query
-        revision = ConjunctionRevision('', '')
+        revision = ConjunctionRevision('', '', self)
         self._add_revision(revision)
 
     @_check_draft_status
@@ -329,7 +364,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         from norm.models.revision import DisjunctionRevision
         # TODO: implement the query
-        revision = DisjunctionRevision('', '')
+        revision = DisjunctionRevision('', '', self)
         self._add_revision(revision)
 
     def fit(self):
@@ -338,7 +373,7 @@ class Lambda(Model, ParametrizedMixin):
         """
         from norm.models.revision import FitRevision
         # TODO: implement the query
-        revision = FitRevision('', '')
+        revision = FitRevision('', '', self)
         self._add_revision(revision)
 
     def _add_data(self, query, df):
@@ -346,13 +381,14 @@ class Lambda(Model, ParametrizedMixin):
         for v in self.variables:
             assert(cols.get(v.name, v.type_.dtype) == v.type_.dtype)
         from norm.models.native import get_type_by_dtype
+        current_variable_names = set(self._all_columns)
         vars_to_add = [Variable(col, get_type_by_dtype(dtype)) for col, dtype in cols.items()
-                       if col not in self._all_columns]
+                       if col not in current_variable_names]
         if len(vars_to_add) > 0:
             from norm.models.revision import AddVariableRevision
-            self._add_revision(AddVariableRevision(vars_to_add))
+            self._add_revision(AddVariableRevision(vars_to_add, self))
         from norm.models.revision import DisjunctionRevision
-        added_data = DisjunctionRevision(query, 'Append new data')
+        added_data = DisjunctionRevision(query, 'Append new data', self)
         added_data.delta = df
         self._add_revision(added_data)
 
@@ -379,13 +415,15 @@ class Lambda(Model, ParametrizedMixin):
 
     @_check_draft_status
     def read_jsonl(self, path):
+        import os
+        logger.error(os.getcwd())
         with open(path) as f:
             df = DataFrame([json.loads(line) for line in f])
         query = 'read("{}", "jsonl")'.format(path)
         self._add_data(query, df)
 
     @_check_draft_status
-    def add_variable(self, *variables):
+    def add_variable(self, variables):
         """
         Add new new variables to the Lambda
         :type variables: Tuple[Variable]
@@ -393,23 +431,23 @@ class Lambda(Model, ParametrizedMixin):
         if len(variables) == 0:
             return
         from norm.models.revision import AddVariableRevision
-        revision = AddVariableRevision(list(variables))
+        revision = AddVariableRevision(variables, self)
         self._add_revision(revision)
 
     @_check_draft_status
-    def delete_variable(self, *names):
+    def delete_variable(self, names):
         """
         Delete variables from the Lambda
-        :type names: Tuple[str]
+        :type names: List[str]
         """
         if len(names) == 0:
             return
         from norm.models.revision import DeleteVariableRevision
-        revision = DeleteVariableRevision(list(names))
+        revision = DeleteVariableRevision(names, self)
         self._add_revision(revision)
 
     @_check_draft_status
-    def rename_variable(self, **renames):
+    def rename_variable(self, renames):
         """
         Change a variable name to another. The argument is a on keyword argument format. The key should exist in
         the Lambda and the value to be the target name.
@@ -418,20 +456,20 @@ class Lambda(Model, ParametrizedMixin):
         if len(renames) == 0:
             return
         from norm.models.revision import RenameVariableRevision
-        revision = RenameVariableRevision(renames)
+        revision = RenameVariableRevision(renames, self)
         self._add_revision(revision)
 
     @_check_draft_status
-    def astype(self, *variables):
+    def astype(self, variables):
         """
         Change the type of variables. The variable names to be changed should exist in current Lambda. The new types
         are specified in the variable type_ attribute.
-        :type variables: Tuple[Variable]
+        :type variables: List[Variable]
         """
         if len(variables) == 0:
             return
         from norm.models.revision import RetypeVariableRevision
-        revision = RetypeVariableRevision(list(variables))
+        revision = RetypeVariableRevision(variables, self)
         self._add_revision(revision)
 
     def _add_revision(self, revision):

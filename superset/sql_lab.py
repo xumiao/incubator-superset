@@ -135,7 +135,9 @@ def execute_norm(ctask, query_id, rendered_query, return_results=True, store_res
     db_engine_spec = database.db_engine_spec
     db_engine_spec.patch()
     try:
-        data = norm.execute(query.executed_sql, session, query.user)
+        from norm.engine import executor
+        norm_engine = executor(query_id, session)
+        data = norm_engine.execute(query.executed_sql)
     except SoftTimeLimitExceeded as e:
         logging.exception(e)
         return handle_error(

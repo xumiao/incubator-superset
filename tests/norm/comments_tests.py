@@ -10,7 +10,7 @@ class CommentsTestCase(NormTestCase):
         ;
         """
         res = self.execute(script)
-        self.assertEqual(res, 'Comment 1')
+        self.assertEqual(res, 'Comment 1\n')
 
     def test_recognize_single_line_comment2(self):
         script = """
@@ -18,7 +18,7 @@ class CommentsTestCase(NormTestCase):
         ;
         """
         res = self.execute(script)
-        self.assertEqual(res, 'Comment 2')
+        self.assertEqual(res, 'Comment 2\n')
 
     def test_fail_single_line_comment1(self):
         script = """

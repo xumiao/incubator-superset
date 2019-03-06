@@ -24,8 +24,8 @@ class TypeName(NormExecutable):
         assert(self.name != '')
 
     def __str__(self):
-        s = self.namespace if self.namespace else ''
-        s += '.' + self.name
+        s = self.namespace + '.' if self.namespace else ''
+        s += self.name
         s += '@' + str(self.version) if self.version is not None else ''
         return s
 
@@ -75,7 +75,7 @@ class ListType(NormExecutable):
         """
         super().__init__()
         self.intern = intern
-        self.llam = None
+        self.lam = None
 
     def compile(self, context):
         """
@@ -95,9 +95,9 @@ class ListType(NormExecutable):
             # create a new ListLambda
             llam = ListLambda(lam)
             context.session.add(llam)
-        self.llam = llam
+        self.lam = llam
         return self
 
     def execute(self, context):
-        return self.llam
+        return self.lam
 
