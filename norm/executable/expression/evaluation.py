@@ -89,11 +89,11 @@ class EvaluationExpr(NormExpression):
         for arg in self.args:
             # arg.expr should have been compiled
             if arg.op == COP.LK:
-                condition = '{}.str.contains("{}")'.format(arg.variable, arg.expr)
+                condition = '{}.str.contains({})'.format(arg.variable, arg.expr)
             else:
                 condition = '{} {} ({})'.format(arg.variable, arg.op, arg.expr)
             inputs.append(condition)
-        return '({}) and ({})'.join(inputs)
+        return ' and '.join(inputs)
 
     def build_outputs(self):
         """
@@ -103,21 +103,17 @@ class EvaluationExpr(NormExpression):
         """
         assert(self.lam is not None)
         nargs = len(self.args)
-        assert(nargs <= self.lam.nargs)
-        keyword_arg = False
+        # assert(nargs <= self.lam.nargs)
         outputs = {}
         from norm.models.norm import Variable
         for ov, arg in zip(self.lam.variables[:nargs], self.args):  # type: Variable, ArgumentExpr
-            if arg.op == COP.EQ:
-                keyword_arg = True
             if arg.projection is not None:
-                assert (len(arg.projection.variables) == 1)
+                assert (len(arg.projection.variables) <= 1)
                 assert (not arg.projection.to_evaluate)
-                if not keyword_arg:
-                    outputs[ov.name] = arg.projection.variables[0]
+                if arg.variable is None:
+                    outputs[ov.name] = arg.projection.variables[0].name
                 else:
-                    assert(arg.variable is not None)
-                    outputs[arg.variable.name] = arg.projection.variables[0]
+                    outputs[arg.variable.name] = arg.projection.variables[0].name
         return outputs
 
     def compile(self, context):

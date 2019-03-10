@@ -12,7 +12,7 @@ from logging.handlers import TimedRotatingFileHandler
 import os
 
 from flask import Flask, redirect
-from flask_appbuilder import AppBuilder, IndexView, SQLA
+from flask_appbuilder import AppBuilder, IndexView, SQLA, Model
 from flask_appbuilder.baseviews import expose
 from flask_compress import Compress
 from flask_migrate import Migrate
@@ -22,6 +22,7 @@ from werkzeug.contrib.fixers import ProxyFix
 from superset import config, utils
 from superset.connectors.connector_registry import ConnectorRegistry
 from superset.security import SupersetSecurityManager
+from flask_sqlalchemy_cache import CachingQuery
 
 APP_DIR = os.path.dirname(__file__)
 CONFIG_MODULE = os.environ.get('SUPERSET_CONFIG', 'superset.config')
@@ -87,18 +88,19 @@ else:
     app.logger.setLevel(logging.INFO)
 logging.getLogger('pyhive.presto').setLevel(logging.INFO)
 
-db = SQLA(app)
-
 if conf.get('WTF_CSRF_ENABLED'):
     csrf = CSRFProtect(app)
     csrf_exempt_list = conf.get('WTF_CSRF_EXEMPT_LIST', [])
     for ex in csrf_exempt_list:
         csrf.exempt(ex)
 
-utils.pessimistic_connection_handling(db.engine)
-
 cache = utils.setup_cache(app, conf.get('CACHE_CONFIG'))
 tables_cache = utils.setup_cache(app, conf.get('TABLE_NAMES_CACHE_CONFIG'))
+
+Model.query_class = CachingQuery
+db = SQLA(app, session_options={'query_cls': CachingQuery})
+
+utils.pessimistic_connection_handling(db.engine)
 
 migrate = Migrate(app, db, directory=APP_DIR + '/migrations')
 
@@ -175,10 +177,10 @@ results_backend = app.config.get('RESULTS_BACKEND')
 
 # Connecting norm packages
 import norm.config as normconfig
-from flask_appbuilder import Model
 normconfig.db = db
 normconfig.Model = Model
 normconfig.user_model = security_manager.user_model
+normconfig.cache = cache
 
 # Registering sources
 module_datasource_map = app.config.get('DEFAULT_MODULE_DS_MAP')

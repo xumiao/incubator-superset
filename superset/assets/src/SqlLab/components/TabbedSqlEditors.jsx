@@ -202,7 +202,7 @@ class TabbedSqlEditors extends React.PureComponent {
                   latestQuery={latestQuery}
                   database={database}
                   actions={this.props.actions}
-                  hideLeftBar={this.state.hideLeftBar}
+                  hideLeftBar={false} //{this.state.hideLeftBar}
                 />
               }
             </div>

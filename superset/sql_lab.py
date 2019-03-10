@@ -136,8 +136,9 @@ def execute_norm(ctask, query_id, rendered_query, return_results=True, store_res
     db_engine_spec.patch()
     try:
         from norm.engine import executor
-        norm_engine = executor(query_id, session)
-        data = norm_engine.execute(query.executed_sql)
+        from uuid import uuid3, NAMESPACE_OID
+        norm_engine = executor(uuid3(NAMESPACE_OID, query.tab_name), session)
+        lam = norm_engine.execute(query.executed_sql)
     except SoftTimeLimitExceeded as e:
         logging.exception(e)
         return handle_error(
@@ -150,7 +151,7 @@ def execute_norm(ctask, query_id, rendered_query, return_results=True, store_res
     if query.status == utils.QueryStatus.STOPPED:
         return handle_error('The query has been stopped')
 
-    cdf = dataframe.SupersetDataFrame(data)
+    cdf = dataframe.SupersetDataFrame(lam.data.iloc[:1000])
 
     query.rows = cdf.size
     query.progress = 100

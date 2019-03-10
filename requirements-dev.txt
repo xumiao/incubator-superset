@@ -39,6 +39,7 @@ flask-oauthlib==0.9.5
 flask-openid==1.2.5
 flask-script==2.0.6
 flask-sqlalchemy==2.1
+flask-sqlalchemy-cache==0.1.5
 flask-testing==0.7.1
 flask-wtf==0.14.2
 flask-sslify==0.1.5

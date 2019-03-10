@@ -7,6 +7,7 @@ from __future__ import unicode_literals
 import json
 import os
 import errno
+import uuid
 
 from datetime import datetime
 import enum
@@ -17,8 +18,11 @@ from sqlalchemy import Column, Integer, String, ForeignKey, Text, Boolean, DateT
 from sqlalchemy import Table
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.ext.hybrid import hybrid_property
-from sqlalchemy.orm import relationship, with_polymorphic
+from sqlalchemy.orm import relationship, with_polymorphic, joinedload
 from sqlalchemy.ext.orderinglist import ordering_list
+from sqlalchemy.orm import lazyload
+from flask_sqlalchemy_cache import FromCache
+from flask_sqlalchemy_cache import RelationshipCache
 
 from norm.models.mixins import lazy_property, ParametrizedMixin, new_version
 from norm.models.license import License
@@ -39,6 +43,7 @@ install_aliases()
 Model = config.Model
 metadata = Model.metadata
 user_model = config.user_model
+cache = config.cache
 
 
 class Variable(Model, ParametrizedMixin):
@@ -210,7 +215,8 @@ class Lambda(Model, ParametrizedMixin):
 
     __mapper_args__ = {
         'polymorphic_identity': 'lambda',
-        'polymorphic_on': category
+        'polymorphic_on': category,
+        'with_polymorphic': '*'
     }
 
     __table_args__ = tuple(UniqueConstraint('namespace', 'name', 'version', name='unique_lambda'))
@@ -296,6 +302,8 @@ class Lambda(Model, ParametrizedMixin):
     @property
     def data(self):
         if self.df is None:
+            self.df = self.from_cache()
+        if self.df is None:
             self.df = self.empty_data()
         return self.df
 
@@ -316,6 +324,7 @@ class Lambda(Model, ParametrizedMixin):
                              params=self.params, variables=self.variables)
         lam.cloned_from = self
         lam.anchor = False
+        lam.level = self.level
         if self.df is not None:
             lam.df = self.df.copy(False)
         return lam
@@ -378,8 +387,9 @@ class Lambda(Model, ParametrizedMixin):
 
     def _add_data(self, query, df):
         cols = {col: dtype for col, dtype in zip(df.columns, df.dtypes)}
-        for v in self.variables:
-            assert(cols.get(v.name, v.type_.dtype) == v.type_.dtype)
+        #for v in self.variables:
+        #    assert(cols.get(v.name, v.type_.dtype) == v.type_.dtype)
+
         from norm.models.native import get_type_by_dtype
         current_variable_names = set(self._all_columns)
         vars_to_add = [Variable(col, get_type_by_dtype(dtype)) for col, dtype in cols.items()
@@ -391,6 +401,7 @@ class Lambda(Model, ParametrizedMixin):
         added_data = DisjunctionRevision(query, 'Append new data', self)
         added_data.delta = df
         self._add_revision(added_data)
+        self.level = Level.QUERYABLE
 
     @_check_draft_status
     def read_csv(self, path, params):
@@ -401,14 +412,22 @@ class Lambda(Model, ParametrizedMixin):
         :param params: the parameters for reading csv
         :type params: Dict
         """
-        df = pd.read_csv(path, **params)
+        if params is not None and isinstance(params, dict):
+            df = pd.read_csv(path, **params)
+        else:
+            params = {}
+            df = pd.read_csv(path)
         query = 'read("{}", {}, "csv")'.format(path, ', '.join('{}={}'.format(key, value)
                                                                for key, value in params.items()))
         self._add_data(query, df)
 
     @_check_draft_status
     def read_parquet(self, path, params):
-        df = pd.read_parquet(path, **params)
+        if params is not None and isinstance(params, dict):
+            df = pd.read_parquet(path, **params)
+        else:
+            params = {}
+            df = pd.read_parquet(path)
         query = 'read("{}", {}, "parq")'.format(path, ', '.join('{}={}'.format(key, value)
                                                                 for key, value in params.items()))
         self._add_data(query, df)
@@ -476,6 +495,29 @@ class Lambda(Model, ParametrizedMixin):
         self.revisions.append(revision)
         revision.apply()
         self.current_revision += 1
+        self.to_cache()
+
+    def from_cache(self):
+        """
+        Retrieve the data from the cache if available
+        :return: the data
+        :rtype: DataFrame
+        """
+        if cache is None:
+            return
+
+        key = (self.id, self.current_revision)
+        return cache.get(key)
+
+    def to_cache(self):
+        """
+        Cache the data frame if cache is available
+        """
+        if cache is None or self.df is None:
+            return
+
+        key = (self.id, self.current_revision)
+        cache.set(key, self.df)
 
     @_check_draft_status
     def save(self):
@@ -646,51 +688,40 @@ class Lambda(Model, ParametrizedMixin):
         """
         pass
 
+    @_only_queryable
     def query(self, inputs, outputs):
         """
         Query the Lambda according to the inputs, and generate another Lambda projected to the outputs
-        :param inputs: the inputs
-        :type inputs: Dict[str, Lambda]
+        :param inputs: the inputs for variable and value pairs, or a query string
+        :type inputs: Dict[str, Lambda] or str
         :param outputs: the outputs
         :type outputs: Dict[str, str]
         :return: the resulting view of the data
         :rtype: Lambda
         """
-        filters = None
-        projections = None
-        if projections is None:
-            df = pd.read_parquet(self.data_file)
+        output_name = outputs.get(self.VAR_OUTPUT, None) or str(uuid.uuid4())
+        rt = Lambda(self.namespace, output_name)
+        rt.level = self.level
+        rt.status = Status.DRAFT
+        if isinstance(inputs, str):
+            # a query string passed in
+            if inputs.find('.str.') > -1:
+                rt.df = self.data.query(inputs, engine='python')
+            else:
+                rt.df = self.data.query(inputs)
         else:
-            df = pd.read_parquet(self.data_file, columns=[col[0] for col in projections])
-            df = df.rename(columns=dict(projections))
-        if filters:
-            projections = dict(projections)
-            from norm.literals import COP
-            for col, op, value in filters:
-                pcol = projections.get(col, col)
-                df = df[df[pcol].notnull()]
-                if op == COP.LK:
-                    df = df[df[pcol].str.contains(value.value)]
-                elif op == COP.GT:
-                    df = df[df[pcol] > value.value]
-                elif op == COP.GE:
-                    df = df[df[pcol] >= value.value]
-                elif op == COP.LT:
-                    df = df[df[pcol] < value.value]
-                elif op == COP.LE:
-                    df = df[df[pcol] <= value.value]
-                elif op == COP.EQ:
-                    df = df[df[pcol] == value.value]
-                elif op == COP.NE:
-                    if value.value is not None:
-                        df = df[df[pcol] != value.value]
-                elif op == COP.IN:
-                    # TODO: Wrong
-                    df = df[df[pcol].isin(value.value)]
-                elif op == COP.NI:
-                    # TODO: Wrong
-                    df = df[~df[pcol].isin(value.value)]
-        return df
+            # TODO: execute the correct revisions according to the inputs and outputs.
+            pass
+        if outputs is not None and len(outputs) > 0:
+            rt.variables = self.variables
+            # TODO: fix this
+            ocols = list(outputs.keys())
+            rt.df = rt.df[ocols].rename(columns=outputs)
+        return rt
+
+    def __add__(self, other):
+        assert(other, Lambda)
+        return 3
 
 
 class GroupLambda(Lambda):
@@ -756,7 +787,18 @@ def retrieve_type(namespaces, name, version=None, status=None, session=None):
     if session is None:
         from norm.config import db
         session = db.session
-    lams = session.query(with_polymorphic(Lambda, '*')) \
+    vc = RelationshipCache(Lambda.variables, cache)
+    oc = RelationshipCache(Lambda.owner, cache)
+    lc = RelationshipCache(Lambda.license, cache)
+    cc = RelationshipCache(Lambda.cloned_from, cache)
+    rc = RelationshipCache(Lambda.revisions, cache)
+    lams = session.query(Lambda) \
+                  .options(FromCache(cache)) \
+                  .options(joinedload(Lambda.variables), oc) \
+                  .options(joinedload(Lambda.owner), vc) \
+                  .options(joinedload(Lambda.license), lc) \
+                  .options(joinedload(Lambda.cloned_from), cc) \
+                  .options(joinedload(Lambda.revisions), rc) \
                   .filter(*queries) \
                   .order_by(desc(Lambda.version)) \
                   .all()
@@ -770,3 +812,26 @@ def retrieve_type(namespaces, name, version=None, status=None, session=None):
 
     assert(lam is None or isinstance(lam, Lambda))
     return lam
+
+
+def retrieve_variable(name, type_id, session=None):
+    """
+    Retrieving the variable by the name and the type id
+    :type name: str
+    :type type_id: int
+    :type session: sqlalchemy.orm.Session or None
+    :rtype: Variable or None
+    """
+    #  find the latest versions
+    if session is None:
+        from norm.config import db
+        session = db.session
+
+    vt = RelationshipCache(Variable.type_, cache)
+    var = session.query(Variable)\
+                 .options(FromCache(cache))\
+                 .options(joinedload(Variable.type_), vt)\
+                 .filter(Variable.name == name,
+                         Variable.type_id == type_id)\
+                 .first()
+    return var

@@ -46,7 +46,7 @@ const propTypes = {
 const defaultProps = {
   database: null,
   latestQuery: null,
-  hideLeftBar: false,
+  hideLeftBar: true,
 };
 
 class SqlEditor extends React.PureComponent {
@@ -276,7 +276,7 @@ class SqlEditor extends React.PureComponent {
       >
         <Row>
           <Collapse
-            in={!this.props.hideLeftBar}
+            in={false} //{!this.props.hideLeftBar}
           >
             <Col
               xs={6}

@@ -11,6 +11,7 @@ import re
 
 from flask import Markup
 from flask_appbuilder import Model
+from flask_appbuilder.models.decorators import renders
 from future.standard_library import install_aliases
 import sqlalchemy as sqla
 from sqlalchemy import (
@@ -125,6 +126,26 @@ class Query(Model):
                if self.tab_name else 'notab')
         tab = re.sub(r'\W+', '', tab)
         return 'sqllab_{tab}_{ts}'.format(**locals())
+
+    @renders('script')
+    def script(self):
+        import re
+        sql = self.sql.replace('\n', '$')
+        match = re.search(r'/\*.*\*/(.*)', sql)
+        if match and len(match.groups()) > 0:
+            return Markup('<div>\n' + match.groups()[0].replace('$', '\n').strip(' \n\r\t') + '</div>')
+        else:
+            return ''
+
+    @renders('description')
+    def description(self):
+        import re
+        sql = self.sql.replace('\n', '$')
+        match = re.search(r'/\*(.*)\*/', sql)
+        if match and len(match.groups()) > 0:
+            return Markup('<p>' + match.groups()[0].replace('$', '\n').strip(' \n\r\t') + '</p>')
+        else:
+            return ''
 
 
 class SavedQuery(Model, AuditMixinNullable):

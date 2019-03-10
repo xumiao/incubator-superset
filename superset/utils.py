@@ -669,7 +669,6 @@ def setup_cache(app, cache_config):
     if cache_config and cache_config.get('CACHE_TYPE') != 'null':
         return Cache(app, config=cache_config)
 
-
 def zlib_compress(data):
     """
     Compress things in a py2/3 safe fashion

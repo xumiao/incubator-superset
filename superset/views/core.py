@@ -18,8 +18,11 @@ from flask import (
 )
 from flask_appbuilder import expose, SimpleFormView
 from flask_appbuilder.actions import action
+from flask_appbuilder.models.sqla.filters import FilterStartsWith
+
 from flask_appbuilder.models.sqla.interface import SQLAInterface
 from flask_appbuilder.security.decorators import has_access, has_access_api
+from flask_appbuilder.widgets import ListThumbnail, ListBlock, ListCarousel
 from flask_babel import gettext as __
 from flask_babel import lazy_gettext as _
 import pandas as pd
@@ -2894,13 +2897,13 @@ appbuilder.add_view(
 appbuilder.add_view_no_menu(CssTemplateAsyncModelView)
 
 appbuilder.add_link(
-    'SQL Editor',
-    label=_('SQL Editor'),
+    'Norm Editor',
+    label=_('Norm Editor'),
     href='/superset/sqllab',
     category_icon='fa-flask',
     icon='fa-flask',
-    category='SQL Lab',
-    category_label=__('SQL Lab'),
+    category='Norm Lab',
+    category_label=__('Norm Lab'),
 )
 
 appbuilder.add_link(
@@ -2909,8 +2912,8 @@ appbuilder.add_link(
     href='/superset/sqllab#search',
     icon='fa-search',
     category_icon='fa-flask',
-    category='SQL Lab',
-    category_label=__('SQL Lab'),
+    category='Norm Lab',
+    category_label=__('Norm Lab'),
 )
 
 appbuilder.add_link(
@@ -2922,6 +2925,44 @@ appbuilder.add_link(
     category_label=__('Sources'),
     category_icon='fa-wrench')
 appbuilder.add_separator('Sources')
+
+
+class TaskView(SupersetModelView, DeleteMixin):
+    datamodel = SQLAInterface(Query)
+    list_widget = ListThumbnail
+    list_columns = ['tab_name', 'description', 'script', 'user', 'status', 'changed_on']
+    label_columns = {
+        'tab_name': 'Task Name',
+        'description': 'Description',
+        'user': 'Creator',
+        'script': 'Script',
+        'status': 'Status'
+    }
+
+    base_filters = [['tab_name', FilterStartsWith, 'Task']]
+    base_order = ('changed_on', 'desc')
+
+    @action('go', __('Go!'), __('Use this task'), 'fa-fighter-jet')
+    def go(self, items):
+        if isinstance(items, list):
+            item = items[0]
+        else:
+            item = items
+        return redirect('/superset/sqllab?dbId={}&schema={}&sql={}&title={}&hideLeftBar=false'
+                        .format(item.database_id,
+                                item.schema,
+                                item.sql,
+                                item.tab_name[4:]))
+
+
+appbuilder.add_view(
+    TaskView,
+    'Task',
+    label=__('Task Templates'),
+    icon='fa-tasks',
+    category='Tasks',
+    category_label=__('Tasks'),
+    category_icon='fa-tasks')
 
 
 @app.after_request

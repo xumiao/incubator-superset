@@ -88,3 +88,9 @@ APP_NAME = 'SuperNorm'
 APP_ICON = '/static/assets/images/supernorm-logo@2x.png'
 
 DATA_STORAGE_ROOT = '/home/work/supernorm/data'
+
+
+CACHE_DEFAULT_TIMEOUT = 60 * 60 * 24
+CACHE_CONFIG = {'CACHE_TYPE': 'norm.cache.simple'}
+
+

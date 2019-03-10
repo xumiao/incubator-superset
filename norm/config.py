@@ -14,7 +14,8 @@ DATA_STORAGE_ROOT = 'data'
 # Security of the data storage
 
 # SQLAlchemy hooks
-db = None
-Model = None
+db = None      # type: flask_sqlalchmey.db
+Model = None   # type: flask_sqlalchemy.Model
 user_model = None
+cache = None  # type: norm.cache.SimpleCache
 

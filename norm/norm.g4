@@ -10,7 +10,7 @@ statement
     | comments? typeName (WS|NS)? COLON EQ (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
     | comments? typeName (WS|NS)? OR EQ (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
     | comments? typeName (WS|NS)? AND EQ (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
-    | comments? multiLineExpression (WS|NS)? SEMICOLON
+    | comments? (WS|NS)? multiLineExpression (WS|NS)? SEMICOLON
     ;
 
 SINGLELINE: '//' ~[\r\n]* [\r\n]*;

@@ -129,16 +129,22 @@ class NormCompiler(normListener):
         parser.addErrorListener(NormErrorListener())
         tree = parser.script()
         walker.walk(self, tree)
-        assert(len(self.stack) == 1)  # Ensure that parsing and compilation has finished completely
-        return self.optimize(self._pop())
+        # assert(len(self.stack) == 1)  # Ensure that parsing and compilation has finished completely
+
+        # return self.optimize(self._pop())
+        return
 
     def execute(self, script):
-        exe = self.compile(dedent(script))
-        if isinstance(exe, NormExecutable):
-            return exe.execute(self)
-        else:
-            # TODO: shouldn't be here
-            return exe
+        self.compile(dedent(script))
+        results = None
+        while len(self.stack) > 0:
+            exe = self._pop()
+            if isinstance(exe, NormExecutable):
+                results = exe.execute(self)
+            else:
+                # TODO: shouldn't be here
+                results = exe
+        return results
 
     def exitStatement(self, ctx:normParser.StatementContext):
         if ctx.typeDeclaration():
